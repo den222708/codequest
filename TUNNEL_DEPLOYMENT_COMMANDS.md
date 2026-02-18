@@ -5,6 +5,12 @@
 - Code pushed to GitHub: https://github.com/den222708/codequest.git
 - Tunnel running on this PC pointing to localhost:3001
 - Public API: https://api.codequest.qzz.io
+- CORS configured for: https://codequest.qzz.io
+
+## CORS Fix Applied
+- Backend CORS now includes `https://codequest.qzz.io` in allowed origins
+- Both `backend/.env` and `backend/src/server.ts` updated
+- Backend restarted with new CORS settings
 
 ---
 
