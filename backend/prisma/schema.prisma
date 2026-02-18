@@ -1,0 +1,255 @@
+// Prisma Schema for CodeQuest (SQLite compatible)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ User Management ============
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  password    String   // Hashed
+  role        String   @default("STUDENT") // STUDENT, PROFESSOR, SUBADMIN, ADMIN, SUPERADMIN
+  avatar      String?
+  department  String?
+  enrollmentId String?
+  employeeId  String?
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE, PENDING
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLogin   DateTime?
+  
+  // Relations
+  createdAssessments Assessment[] @relation("CreatedAssessments")
+  createdQuestions   Question[]   @relation("CreatedQuestions")
+  submissions        Submission[]
+  attempts           AssessmentAttempt[]
+  systemLogs         SystemLog[]
+  activeSessions     ActiveSession[]
+}
+
+// ============ Questions ============
+
+model Question {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  difficulty  String   // EASY, MEDIUM, HARD
+  topic       String
+  tags        String   // JSON array stored as string
+  points      Int
+  timeLimit   Int      // in minutes
+  memoryLimit Int      // in MB
+  type        String   @default("CODING") // CODING, MCQ, SHORT, TRUE_FALSE, FILE_UPLOAD
+  
+  boilerplateCode String  // JSON object stored as string
+  isVisible   Boolean  @default(true)
+  usageCount  Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  createdBy   User     @relation("CreatedQuestions", fields: [createdById], references: [id])
+  createdById String
+  testCases   TestCase[]
+  assessmentQuestions AssessmentQuestion[]
+  submissions Submission[]
+}
+
+model TestCase {
+  id             String   @id @default(cuid())
+  input          String
+  expectedOutput String
+  isHidden       Boolean  @default(false)
+  points         Int
+  timeLimit      Int      // in ms
+  
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId     String
+}
+
+// ============ Assessments ============
+
+model Assessment {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  type        String   // QUIZ, EXAM, ASSIGNMENT, PRACTICE
+  difficulty  String   // EASY, MEDIUM, HARD
+  duration    Int      // in minutes
+  passingScore Int
+  totalPoints Int
+  
+  startDate   DateTime
+  endDate     DateTime
+  status      String   @default("DRAFT") // DRAFT, PUBLISHED, ACTIVE, COMPLETED
+  
+  // Settings stored as JSON string
+  settings    String
+  
+  courseCode   String?
+  courseName   String?
+  professorName String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  createdBy   User     @relation("CreatedAssessments", fields: [createdById], references: [id])
+  createdById String
+  questions   AssessmentQuestion[]
+  attempts    AssessmentAttempt[]
+}
+
+// Extended question types scaffolding
+model QuestionTypeMeta {
+  id        String   @id @default(cuid())
+  key       String   @unique // coding, mcq, short, true_false, file_upload
+  label     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AssessmentQuestion {
+  id           String     @id @default(cuid())
+  order        Int
+  
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessmentId String
+  question     Question   @relation(fields: [questionId], references: [id])
+  questionId   String
+  
+  @@unique([assessmentId, questionId])
+}
+
+// ============ Submissions ============
+
+model Submission {
+  id          String   @id @default(cuid())
+  code        String
+  language    String
+  status      String   // PENDING, RUNNING, ACCEPTED, WRONG_ANSWER, TIME_LIMIT, MEMORY_LIMIT, RUNTIME_ERROR, COMPILE_ERROR
+  score       Int?
+  
+  // Execution results stored as JSON
+  results     String?
+  
+  executionTime Int?   // in ms
+  memoryUsed  Int?     // in KB
+  
+  submittedAt DateTime @default(now())
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  question    Question @relation(fields: [questionId], references: [id])
+  questionId  String
+  attempt     AssessmentAttempt? @relation(fields: [attemptId], references: [id])
+  attemptId   String?
+}
+
+model AssessmentAttempt {
+  id           String   @id @default(cuid())
+  startedAt    DateTime @default(now())
+  submittedAt  DateTime?
+  score        Int?
+  status       String   @default("IN_PROGRESS") // IN_PROGRESS, SUBMITTED, GRADED, TIMED_OUT
+  
+  // Proctoring data stored as JSON
+  proctoringData String?
+  
+  // Relations
+  user         User       @relation(fields: [userId], references: [id])
+  userId       String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id])
+  assessmentId String
+  submissions  Submission[]
+  
+  @@unique([userId, assessmentId])
+}
+
+// ============ System ============
+
+model SystemLog {
+  id         String   @id @default(cuid())
+  level      String   // DEBUG, INFO, WARNING, ERROR
+  category   String
+  message    String
+  metadata   String?  // JSON
+  ipAddress  String?
+  userAgent  String?
+  
+  timestamp  DateTime @default(now())
+  
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     String?
+}
+
+model Backup {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // FULL, INCREMENTAL, DIFFERENTIAL
+  size      BigInt
+  status    String   @default("COMPLETED") // IN_PROGRESS, COMPLETED, FAILED
+  includes  String   // JSON array
+  
+  createdAt DateTime @default(now())
+}
+
+model ActiveSession {
+  id          String   @id @default(cuid())
+  ipAddress   String
+  userAgent   String
+  device      String
+  location    String?
+  
+  createdAt   DateTime @default(now())
+  lastActive  DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+}
+
+// ============ Plagiarism ============
+
+model PlagiarismResult {
+  id            String   @id @default(cuid())
+  similarity    Float
+  status        String   @default("PENDING") // PENDING, CLEARED, CONFIRMED
+  matchedSections String  // JSON
+  
+  submission1Id String
+  submission2Id String
+  student1Name  String
+  student2Name  String
+  
+  createdAt     DateTime @default(now())
+  reviewedAt    DateTime?
+}
+
+// ============ Leaderboard ============
+
+model LeaderboardEntry {
+  id            String   @id @default(cuid())
+  rank          Int
+  totalScore    Int
+  problemsSolved Int
+  avgTime       Float
+  streak        Int
+  
+  userId        String   @unique
+  userName      String
+  userAvatar    String?
+  department    String?
+  
+  updatedAt     DateTime @updatedAt
+}
