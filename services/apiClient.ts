@@ -3,7 +3,11 @@
  * Handles all HTTP requests with JWT auth and token refresh
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD
+    ? 'https://api.codequest.qzz.io/api/v1'
+    : 'http://localhost:3001/api/v1');
 
 // Token storage
 const TOKEN_KEY = 'cq_access_token';
