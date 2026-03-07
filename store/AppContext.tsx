@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { User, Role, Notification, Question, Assessment, Submission, AssessmentAttempt, SystemLog, SystemHealth, Backup, LeaderboardEntry, PlagiarismResult, ActiveSession, RolePermissions, ROLE_PERMISSIONS } from '../types';
-import { mockNotifications, mockSystemLogs, mockSystemHealth, mockBackups, mockLeaderboard, mockPlagiarismResults, mockActiveSessions } from '../data/mockData';
+
 import { demoAssessment, demoQuestions, demoStudentUser } from '../data/demoModeData';
 import { authService } from '../services/authService';
 import { assessmentService } from '../services/assessmentService';
@@ -110,15 +110,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     users: [],
     questions: [],
     assessments: [],
-    notifications: mockNotifications,
+    notifications: [],
     submissions: [],
     attempts: [],
-    systemLogs: mockSystemLogs,
-    systemHealth: mockSystemHealth,
-    backups: mockBackups,
-    leaderboard: mockLeaderboard,
-    plagiarismResults: mockPlagiarismResults,
-    activeSessions: mockActiveSessions,
+    systemLogs: [],
+    systemHealth: { cpu: 0, memory: 0, disk: 0, uptime: '0h', activeUsers: 0, requestsPerMinute: 0, avgResponseTime: 0, errorRate: 0, services: [] },
+    backups: [],
+    leaderboard: [],
+    plagiarismResults: [],
+    activeSessions: [],
     darkMode: false,
     sidebarCollapsed: false,
     isDemoMode: false,
@@ -131,7 +131,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const demoBootstrapPromise = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
-    document.documentElement.classList.remove('dark');
+    if (state.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [state.darkMode]);
 
   // Session restore on mount
@@ -598,8 +602,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // UI Actions
   const toggleDarkMode = () => {
-    document.documentElement.classList.remove('dark');
-    setState(prev => ({ ...prev, darkMode: false }));
+    setState(prev => ({ ...prev, darkMode: !prev.darkMode }));
   };
 
   const toggleSidebar = () => {

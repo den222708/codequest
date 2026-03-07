@@ -6,62 +6,13 @@ const CourseManagement: React.FC = () => {
     const { users } = useApp();
 
     // Local state for courses (will be moved to context later)
-    const [courses, setCourses] = useState<Course[]>([
-        {
-            id: 'course-1',
-            code: 'CS201',
-            name: 'Data Structures',
-            description: 'Fundamental data structures and algorithms',
-            department: 'Computer Science',
-            credits: 4,
-            status: 'active',
-            createdBy: 'admin-1',
-            createdAt: '2024-01-15',
-            updatedAt: '2024-01-15',
-        },
-        {
-            id: 'course-2',
-            code: 'CS101',
-            name: 'Introduction to Programming',
-            description: 'Basic programming concepts using Python',
-            department: 'Computer Science',
-            credits: 3,
-            status: 'active',
-            createdBy: 'admin-1',
-            createdAt: '2024-01-10',
-            updatedAt: '2024-01-10',
-        },
-        {
-            id: 'course-3',
-            code: 'CS301',
-            name: 'Algorithms',
-            description: 'Advanced algorithm design and analysis',
-            department: 'Computer Science',
-            credits: 4,
-            status: 'archived',
-            createdBy: 'admin-1',
-            createdAt: '2023-08-01',
-            updatedAt: '2024-01-01',
-        },
-    ]);
+    const [courses, setCourses] = useState<Course[]>([]);
 
-    const [semesters, setSemesters] = useState<Semester[]>([
-        { id: 'sem-1', courseId: 'course-1', name: 'Fall 2026', year: 2026, term: 'fall', startDate: '2026-08-15', endDate: '2026-12-15', status: 'upcoming' },
-        { id: 'sem-2', courseId: 'course-1', name: 'Spring 2026', year: 2026, term: 'spring', startDate: '2026-01-15', endDate: '2026-05-15', status: 'active' },
-        { id: 'sem-3', courseId: 'course-2', name: 'Fall 2026', year: 2026, term: 'fall', startDate: '2026-08-15', endDate: '2026-12-15', status: 'upcoming' },
-    ]);
+    const [semesters, setSemesters] = useState<Semester[]>([]);
 
-    const [labs, setLabs] = useState<Lab[]>([
-        { id: 'lab-1', semesterId: 'sem-1', name: 'Lab Section A', schedule: 'Mon 10:00 AM - 11:30 AM', location: 'Room 301', capacity: 30, status: 'active' },
-        { id: 'lab-2', semesterId: 'sem-1', name: 'Lab Section B', schedule: 'Wed 2:00 PM - 3:30 PM', location: 'Room 302', capacity: 25, status: 'active' },
-        { id: 'lab-3', semesterId: 'sem-2', name: 'Lab Section C', schedule: 'Tue 9:00 AM - 10:30 AM', location: 'Room 301', capacity: 28, status: 'active' },
-        { id: 'lab-4', semesterId: 'sem-3', name: 'Lab Section A', schedule: 'Thu 11:00 AM - 12:30 PM', location: 'Room 201', capacity: 35, status: 'active' },
-    ]);
+    const [labs, setLabs] = useState<Lab[]>([]);
 
-    const [studentGroups, setStudentGroups] = useState<StudentGroup[]>([
-        { id: 'group-1', labId: 'lab-1', name: 'Morning Batch', studentIds: ['1', '2'], createdAt: '2024-01-20' },
-        { id: 'group-2', labId: 'lab-2', name: 'Afternoon Batch', studentIds: ['3'], createdAt: '2024-01-20' },
-    ]);
+    const [studentGroups, setStudentGroups] = useState<StudentGroup[]>([]);
 
     const [expandedCourses, setExpandedCourses] = useState<string[]>(['course-1']);
     const [expandedSemesters, setExpandedSemesters] = useState<string[]>(['sem-1']);

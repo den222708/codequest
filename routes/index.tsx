@@ -38,7 +38,6 @@ import UserManagement from '../screens/UserManagement';
 import AdminManagement from '../screens/AdminManagement';
 import SystemLogs from '../screens/SystemLogs';
 import SystemHealth from '../screens/SystemHealth';
-import BackupManagement from '../screens/BackupManagement';
 import CourseManagement from '../screens/CourseManagement';
 
 // Shared Screens
@@ -165,6 +164,8 @@ const AppRoutes: React.FC = () => {
     submissions,
     systemLogs,
     systemHealth,
+    leaderboard,", "oldString": "    systemLogs,
+    systemHealth,
     backups,
     leaderboard,
     plagiarismResults,
@@ -192,8 +193,6 @@ const AppRoutes: React.FC = () => {
     setEditingAssessment,
     markNotificationRead,
     clearNotifications,
-    createBackup,
-    deleteBackup,
     reviewPlagiarism,
     refreshSystemHealth,
   } = useApp();
@@ -325,6 +324,7 @@ const AppRoutes: React.FC = () => {
               darkMode={darkMode}
               toggleTheme={toggleDarkMode}
               notifications={notifications}
+              userName={currentUser?.name}
             >
               <Routes>
                 <Route
@@ -440,6 +440,7 @@ const AppRoutes: React.FC = () => {
               darkMode={darkMode}
               toggleTheme={toggleDarkMode}
               notifications={notifications}
+              userName={currentUser?.name}
             >
               <Routes>
                 <Route
@@ -576,10 +577,9 @@ const AppRoutes: React.FC = () => {
               onLogout={handleLogout}
               darkMode={darkMode}
               toggleTheme={toggleDarkMode}
-              notifications={notifications}
-            >
+              notifications={notifications}              userName={currentUser?.name}            >
               <Routes>
-                <Route path="dashboard" element={<AdminSettings />} />
+                <Route path="dashboard" element={<Navigate to="/admin/courses" replace />} />
                 <Route path="courses" element={<CourseManagement />} />
                 <Route
                   path="users"
@@ -631,20 +631,8 @@ const AppRoutes: React.FC = () => {
                     />
                   }
                 />
-                <Route
-                  path="backups"
-                  element={
-                    <BackupManagement
-                      backups={backups}
-                      onCreateBackup={createBackup}
-                      onRestoreBackup={(id) => console.log('Restoring backup:', id)}
-                      onDeleteBackup={deleteBackup}
-                      onDownloadBackup={(id) => console.log('Downloading backup:', id)}
-                    />
-                  }
-                />
                 <Route path="settings" element={<AdminSettings />} />
-                <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/admin/courses" replace />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

@@ -300,30 +300,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
         )}
       </div>
 
-      {/* System Info */}
-      <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
-        <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-          <span>ℹ️</span> System Information
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-[#0d0d0d] rounded-lg p-3">
-            <div className="text-gray-400 text-sm">Platform Version</div>
-            <div className="text-white font-medium mt-1">CodeQuest v1.0.0</div>
-          </div>
-          <div className="bg-[#0d0d0d] rounded-lg p-3">
-            <div className="text-gray-400 text-sm">Node.js Version</div>
-            <div className="text-white font-medium mt-1">v20.10.0</div>
-          </div>
-          <div className="bg-[#0d0d0d] rounded-lg p-3">
-            <div className="text-gray-400 text-sm">Database</div>
-            <div className="text-white font-medium mt-1">PostgreSQL 15.2</div>
-          </div>
-          <div className="bg-[#0d0d0d] rounded-lg p-3">
-            <div className="text-gray-400 text-sm">Cache</div>
-            <div className="text-white font-medium mt-1">Redis 7.2</div>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 };

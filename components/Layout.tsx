@@ -9,6 +9,7 @@ interface LayoutProps {
   darkMode: boolean;
   toggleTheme: () => void;
   notifications?: Notification[];
+  userName?: string;
 }
 
 const Layout: React.FC<LayoutProps> = ({
@@ -17,7 +18,8 @@ const Layout: React.FC<LayoutProps> = ({
   onLogout,
   darkMode,
   toggleTheme,
-  notifications = []
+  notifications = [],
+  userName = ''
 }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -51,7 +53,6 @@ const Layout: React.FC<LayoutProps> = ({
     { icon: 'analytics', label: 'Analytics', path: '/admin/analytics' },
     { icon: 'monitoring', label: 'System Health', path: '/admin/system/health' },
     { icon: 'description', label: 'System Logs', path: '/admin/system/logs' },
-    { icon: 'backup', label: 'Backups', path: '/admin/backups' },
     { icon: 'settings', label: 'Settings', path: '/admin/settings' },
   ];
 
@@ -76,7 +77,6 @@ const Layout: React.FC<LayoutProps> = ({
     { icon: 'assignment', label: 'Assessments', path: '/professor/assessments' },
     { icon: 'monitoring', label: 'System Health', path: '/admin/system/health' },
     { icon: 'description', label: 'System Logs', path: '/admin/system/logs' },
-    { icon: 'backup', label: 'Backups', path: '/admin/backups' },
     { icon: 'settings', label: 'Settings', path: '/admin/settings' },
   ];
 
@@ -231,11 +231,11 @@ const Layout: React.FC<LayoutProps> = ({
             {/* Profile */}
             <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-700">
               <div className="w-9 h-9 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
-                {role === 'student' ? 'AJ' : role === 'professor' ? 'AT' : 'AS'}
+                {(userName || role).substring(0, 2).toUpperCase()}
               </div>
               <div className="hidden md:block">
                 <p className="text-sm font-medium">
-                  {role === 'student' ? 'Alex Johnson' : role === 'professor' ? 'Prof. Turing' : 'Admin'}
+                  {userName || role}
                 </p>
                 <p className="text-xs text-slate-500 capitalize">{role}</p>
               </div>
