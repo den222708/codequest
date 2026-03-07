@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 *.log
+migration copy.sql
+seed copy.sql

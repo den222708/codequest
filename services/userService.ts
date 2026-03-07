@@ -6,7 +6,7 @@ function mapUser(raw: any): User {
     id: raw.id || raw.userId || raw.user_id,
     name: raw.name,
     email: raw.email,
-    role: raw.role,
+    role: raw.role === 'teacher' ? 'professor' : raw.role,
     avatar: raw.avatar || raw.avatar_url || '',
     department: raw.department || '',
     enrollmentId: raw.enrollmentId || raw.enrollment_id || '',

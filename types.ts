@@ -526,8 +526,7 @@ export interface ClassInfo {
   teacherId: string;
   teacherName: string;
   teacherEmail: string;
-  status: 'active' | 'archived';
-  createdBy: string;
+  status: 'active' | 'archived';  schedule: string;  createdBy: string;
   createdAt: string;
   updatedAt: string;
   studentCount: number;

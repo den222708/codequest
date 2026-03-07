@@ -33,15 +33,9 @@ import PlagiarismReport from '../screens/PlagiarismReport';
 import Analytics from '../screens/Analytics';
 
 // Admin Screens
-import AdminSettings from '../screens/AdminSettings';
 import UserManagement from '../screens/UserManagement';
 import AdminManagement from '../screens/AdminManagement';
-import SystemLogs from '../screens/SystemLogs';
-import SystemHealth from '../screens/SystemHealth';
 import CourseManagement from '../screens/CourseManagement';
-
-// Shared Screens
-import Notifications from '../screens/Notifications';
 
 const DemoEntryPage: React.FC = () => {
   const { startDemoMode } = useApp();
@@ -160,10 +154,7 @@ const AppRoutes: React.FC = () => {
     questions,
     assessments,
     currentAssessment,
-    notifications,
     submissions,
-    systemLogs,
-    systemHealth,
     leaderboard,
     plagiarismResults,
     editingAssessment,
@@ -188,10 +179,7 @@ const AppRoutes: React.FC = () => {
     startAssessment,
     submitAssessment,
     setEditingAssessment,
-    markNotificationRead,
-    clearNotifications,
     reviewPlagiarism,
-    refreshSystemHealth,
   } = useApp();
 
   const navigate = useNavigate();
@@ -320,7 +308,6 @@ const AppRoutes: React.FC = () => {
               onLogout={handleLogout}
               darkMode={darkMode}
               toggleTheme={toggleDarkMode}
-              notifications={notifications}
               userName={currentUser?.name}
             >
               <Routes>
@@ -436,7 +423,6 @@ const AppRoutes: React.FC = () => {
               onLogout={handleLogout}
               darkMode={darkMode}
               toggleTheme={toggleDarkMode}
-              notifications={notifications}
               userName={currentUser?.name}
             >
               <Routes>
@@ -574,7 +560,8 @@ const AppRoutes: React.FC = () => {
               onLogout={handleLogout}
               darkMode={darkMode}
               toggleTheme={toggleDarkMode}
-              notifications={notifications}              userName={currentUser?.name}            >
+              userName={currentUser?.name}
+            >
               <Routes>
                 <Route path="dashboard" element={<Navigate to="/admin/courses" replace />} />
                 <Route path="courses" element={<CourseManagement />} />
@@ -604,31 +591,6 @@ const AppRoutes: React.FC = () => {
                   path="analytics"
                   element={<Analytics role="admin" />}
                 />
-                <Route
-                  path="system/health"
-                  element={
-                    <SystemHealth
-                      health={systemHealth}
-                      onRefresh={refreshSystemHealth}
-                      onServiceRestart={(serviceName) => {
-                        console.log('Restarting service:', serviceName);
-                      }}
-                    />
-                  }
-                />
-                <Route
-                  path="system/logs"
-                  element={
-                    <SystemLogs
-                      logs={systemLogs}
-                      users={users}
-                      onExport={(format) => {
-                        console.log('Exporting logs as:', format);
-                      }}
-                    />
-                  }
-                />
-                <Route path="settings" element={<AdminSettings />} />
                 <Route path="*" element={<Navigate to="/admin/courses" replace />} />
               </Routes>
             </Layout>
@@ -637,19 +599,6 @@ const AppRoutes: React.FC = () => {
       />
 
       {/* Shared Protected Routes */}
-      <Route
-        path="/notifications"
-        element={
-          <ProtectedRoute>
-            <Notifications
-              notifications={notifications}
-              onMarkRead={markNotificationRead}
-              onClearAll={clearNotifications}
-            />
-          </ProtectedRoute>
-        }
-      />
-
       {/* Catch all - redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

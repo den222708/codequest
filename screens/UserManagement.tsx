@@ -163,10 +163,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
           </p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium">
-            <span className="material-symbols-outlined text-lg">upload</span>
-            Import CSV
-          </button>
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-5 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
@@ -226,16 +222,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
               <option value="professor">Professors</option>
               {canManageAdmins && <option value="admin">Admins</option>}
             </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="pending">Pending</option>
-            </select>
           </div>
         </div>
       </div>
@@ -247,8 +233,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
             <tr>
               <th className="p-4 text-left text-xs font-semibold text-slate-500 uppercase">User</th>
               <th className="p-4 text-left text-xs font-semibold text-slate-500 uppercase">Role</th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-500 uppercase">Department</th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-500 uppercase">Status</th>
+              <th className="p-4 text-left text-xs font-semibold text-slate-500 uppercase">Enrollment Number</th>
               <th className="p-4 text-left text-xs font-semibold text-slate-500 uppercase">Last Login</th>
               <th className="p-4 text-right text-xs font-semibold text-slate-500 uppercase">Actions</th>
             </tr>
@@ -276,12 +261,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
                   </div>
                 </td>
                 <td className="p-4 text-slate-600 dark:text-slate-400">
-                  {user.department || '-'}
-                </td>
-                <td className="p-4">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold capitalize ${getStatusColor(user.status)}`}>
-                    {user.status}
-                  </span>
+                  {user.enrollmentId || user.employeeId || '-'}
                 </td>
                 <td className="p-4 text-sm text-slate-500">
                   {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
@@ -340,7 +320,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                  placeholder="John Doe"
                 />
               </div>
 
@@ -351,7 +330,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                  placeholder="user@university.edu"
                 />
               </div>
 
@@ -384,19 +362,17 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                  placeholder="Computer Science"
                 />
               </div>
 
               {formData.role === 'student' && (
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Enrollment ID</label>
+                  <label className="block text-sm font-semibold mb-2">Enrollment Number</label>
                   <input
                     type="text"
                     value={formData.enrollmentId}
                     onChange={(e) => setFormData({ ...formData, enrollmentId: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                    placeholder="CS2024001"
                   />
                 </div>
               )}
@@ -409,23 +385,9 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
                     value={formData.employeeId}
                     onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                    placeholder="EMP001"
                   />
                 </div>
               )}
-
-              <div>
-                <label className="block text-sm font-semibold mb-2">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
             </div>
 
             <div className="flex gap-3 mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">

@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS classes (
   code            TEXT NOT NULL UNIQUE,
   description     TEXT,
   department      TEXT,
+  schedule        TEXT,
   teacher_id      UUID REFERENCES profiles(user_id) ON DELETE SET NULL,
   status          TEXT NOT NULL CHECK (status IN ('active', 'archived')) DEFAULT 'active',
   created_by      UUID REFERENCES profiles(user_id) ON DELETE SET NULL,

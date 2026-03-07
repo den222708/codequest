@@ -316,8 +316,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       department: user.department,
       enrollmentId: user.enrollmentId || user.employeeId,
     });
-    setState(prev => ({ ...prev, users: [...prev.users, result.user] }));
-    addNotification({ type: 'success', title: 'User Created', message: `Account for ${result.user.name} created successfully.` });
+    await loadUsers();
     return result;
   };
 

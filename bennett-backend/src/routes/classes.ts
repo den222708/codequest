@@ -15,6 +15,7 @@ const classSchema = z.object({
   code: z.string().min(2).max(50),
   description: z.string().max(1000).optional(),
   department: z.string().max(100).optional(),
+  schedule: z.string().max(500).optional(),
   teacherId: z.string().uuid(),
 });
 
@@ -109,6 +110,7 @@ classes.post("/", requireRole("admin"), async (c) => {
       code: d.code,
       description: d.description ?? null,
       department: d.department ?? null,
+      schedule: d.schedule ?? null,
       teacher_id: d.teacherId,
       created_by: user.id,
     })
@@ -138,6 +140,7 @@ classes.put("/:id", requireRole("admin"), async (c) => {
   if (d.code) updates.code = d.code;
   if (d.description !== undefined) updates.description = d.description;
   if (d.department !== undefined) updates.department = d.department;
+  if (d.schedule !== undefined) updates.schedule = d.schedule;
   if (d.teacherId) {
     // Verify new teacher
     const { data: teacher } = await supabase

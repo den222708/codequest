@@ -21,7 +21,7 @@ const CourseManagement: React.FC = () => {
 
     // Form state
     const [classForm, setClassForm] = useState({
-        name: '', code: '', description: '', department: '', teacherId: '',
+        name: '', code: '', description: '', department: '', teacherId: '', schedule: '',
     });
 
     useEffect(() => {
@@ -53,7 +53,7 @@ const CourseManagement: React.FC = () => {
             }
             await loadClasses();
             setShowClassModal(false);
-            setClassForm({ name: '', code: '', description: '', department: '', teacherId: '' });
+            setClassForm({ name: '', code: '', description: '', department: '', teacherId: '', schedule: '' });
             setEditingClass(null);
         } catch (err: any) {
             setErrorMsg(err?.message || 'Failed to save class');
@@ -121,11 +121,11 @@ const CourseManagement: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold">Class Management</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Manage classes, assign teachers, and enroll students</p>
+                    <h1 className="text-3xl font-bold">Course Management</h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Manage courses, assign teachers, and enroll students</p>
                 </div>
                 <button
-                    onClick={() => { setClassForm({ name: '', code: '', description: '', department: '', teacherId: '' }); setEditingClass(null); setErrorMsg(''); setShowClassModal(true); }}
+                    onClick={() => { setClassForm({ name: '', code: '', description: '', department: '', teacherId: '', schedule: '' }); setEditingClass(null); setErrorMsg(''); setShowClassModal(true); }}
                     className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
                 >
                     <span className="material-symbols-outlined">add</span>
@@ -215,7 +215,7 @@ const CourseManagement: React.FC = () => {
                                     </button>
                                     <button onClick={() => {
                                         setEditingClass(cls);
-                                        setClassForm({ name: cls.name, code: cls.code, description: cls.description, department: cls.department, teacherId: cls.teacherId });
+                                        setClassForm({ name: cls.name, code: cls.code, description: cls.description, department: cls.department, teacherId: cls.teacherId, schedule: cls.schedule || '' });
                                         setErrorMsg('');
                                         setShowClassModal(true);
                                     }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg" title="Edit">
@@ -245,33 +245,23 @@ const CourseManagement: React.FC = () => {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-semibold mb-2">Class Code *</label>
+                                    <label className="block text-sm font-semibold mb-2">Course Code *</label>
                                     <input type="text" value={classForm.code}
                                         onChange={(e) => setClassForm(prev => ({ ...prev, code: e.target.value }))}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                        placeholder="CS201-A" />
+                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold mb-2">Department</label>
-                                    <input type="text" value={classForm.department}
-                                        onChange={(e) => setClassForm(prev => ({ ...prev, department: e.target.value }))}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                        placeholder="Computer Science" />
+                                    <label className="block text-sm font-semibold mb-2">Course Name *</label>
+                                    <input type="text" value={classForm.name}
+                                        onChange={(e) => setClassForm(prev => ({ ...prev, name: e.target.value }))}
+                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700" />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold mb-2">Class Name *</label>
-                                <input type="text" value={classForm.name}
-                                    onChange={(e) => setClassForm(prev => ({ ...prev, name: e.target.value }))}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                    placeholder="Data Structures Section A" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold mb-2">Description</label>
-                                <textarea value={classForm.description}
-                                    onChange={(e) => setClassForm(prev => ({ ...prev, description: e.target.value }))}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                    rows={2} placeholder="Class description..." />
+                                <label className="block text-sm font-semibold mb-2">Schedule</label>
+                                <input type="text" value={classForm.schedule}
+                                    onChange={(e) => setClassForm(prev => ({ ...prev, schedule: e.target.value }))}
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700" />
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold mb-2">Assign Teacher *</label>

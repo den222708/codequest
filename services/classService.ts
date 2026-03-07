@@ -12,6 +12,7 @@ function mapClass(raw: any): ClassInfo {
     teacherName: raw.teacherName || '',
     teacherEmail: raw.teacherEmail || '',
     status: raw.status || 'active',
+    schedule: raw.schedule || '',
     createdBy: raw.createdBy || raw.created_by || '',
     createdAt: raw.createdAt || raw.created_at || '',
     updatedAt: raw.updatedAt || raw.updated_at || '',
@@ -49,6 +50,7 @@ export const classService = {
     description?: string;
     department?: string;
     teacherId: string;
+    schedule?: string;
   }): Promise<ClassInfo> {
     const data = await api.post<any>('/classes', input);
     return mapClass(data);
@@ -61,6 +63,7 @@ export const classService = {
     department: string;
     teacherId: string;
     status: string;
+    schedule: string;
   }>): Promise<ClassInfo> {
     const data = await api.put<any>(`/classes/${encodeURIComponent(id)}`, updates);
     return mapClass(data);
