@@ -73,28 +73,7 @@ npm run build
 Create `backend/.env`:
 
 ```env
-NODE_ENV=production
-PORT=3001
-DATABASE_URL="file:./dev.db"
 
-JWT_SECRET=CHANGE_THIS_TO_A_LONG_RANDOM_SECRET
-JWT_EXPIRES_IN=15m
-REFRESH_TOKEN_EXPIRES_IN=7d
-
-FRONTEND_URL=https://codequest.qzz.io
-
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX_REQUESTS=100
-DISABLE_RATE_LIMIT=false
-DISABLE_AUTH_LOCKOUT=false
-
-DEMO_MODE=true
-
-EXECUTOR_PROVIDER=self-host
-JUDGE0_BASE_URL=http://localhost:2358
-JUDGE0_AUTH_TOKEN=
-JUDGE0_RAPIDAPI_KEY=
-JUDGE0_RAPIDAPI_HOST=judge0-ce.p.rapidapi.com
 ```
 
 Start backend:

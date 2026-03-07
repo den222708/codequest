@@ -25,3 +25,9 @@ backend/prisma/dev.db
 *.njsproj
 *.sln
 *.sw?
+
+# Claude
+.claude/
+
+# Nested git repos
+api-test/
