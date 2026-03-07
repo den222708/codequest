@@ -56,9 +56,9 @@ async function tryRefreshToken(): Promise<boolean> {
     });
     if (!res.ok) return false;
     const data = await res.json();
-    const tokens = data.data?.tokens || data.tokens;
-    if (tokens?.accessToken) {
-      tokenStore.setTokens(tokens.accessToken, tokens.refreshToken);
+    const session = data.data || data;
+    if (session?.accessToken) {
+      tokenStore.setTokens(session.accessToken, session.refreshToken);
       return true;
     }
     return false;

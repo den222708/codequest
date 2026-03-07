@@ -3,13 +3,13 @@ import type { User, Role } from '../types';
 
 export interface LoginResponse {
   user: User;
-  tokens: { accessToken: string; refreshToken: string };
+  session: { accessToken: string; refreshToken: string; expiresAt?: number };
 }
 
 export const authService = {
   async login(email: string, password: string): Promise<User> {
     const data = await api.post<LoginResponse>('/auth/login', { email, password });
-    tokenStore.setTokens(data.tokens.accessToken, data.tokens.refreshToken);
+    tokenStore.setTokens(data.session.accessToken, data.session.refreshToken);
     const user = mapUser(data.user);
     tokenStore.setUser(user);
     return user;
@@ -22,7 +22,7 @@ export const authService = {
       password,
       role: role?.toUpperCase(),
     });
-    tokenStore.setTokens(data.tokens.accessToken, data.tokens.refreshToken);
+    tokenStore.setTokens(data.session.accessToken, data.session.refreshToken);
     const user = mapUser(data.user);
     tokenStore.setUser(user);
     return user;
