@@ -6,7 +6,6 @@ import RoleBasedRoute from './RoleBasedRoute';
 import Layout from '../components/Layout';
 
 // Public Screens
-import LandingPage from '../screens/LandingPage';
 import Login from '../screens/Login';
 import Signup from '../screens/Signup';
 import ForgotPassword from '../screens/ForgotPassword';
@@ -254,29 +253,26 @@ const AppRoutes: React.FC = () => {
     setRole(selectedRole);
   };
 
+  const loginOrDashboard = isAuthenticated ? (
+    <Navigate
+      to={
+        currentUser?.role === 'student'
+          ? '/student/dashboard'
+          : currentUser?.role === 'professor'
+            ? '/professor/dashboard'
+            : '/admin/dashboard'
+      }
+      replace
+    />
+  ) : (
+    <Login />
+  );
+
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<LandingPage />} />
-      <Route
-        path="/login"
-        element={
-          isAuthenticated ? (
-            <Navigate
-              to={
-                currentUser?.role === 'student'
-                  ? '/student/dashboard'
-                  : currentUser?.role === 'professor'
-                    ? '/professor/dashboard'
-                    : '/admin/dashboard'
-              }
-              replace
-            />
-          ) : (
-            <Login />
-          )
-        }
-      />
+      <Route path="/" element={loginOrDashboard} />
+      <Route path="/login" element={loginOrDashboard} />
       <Route
         path="/signup"
         element={
