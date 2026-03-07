@@ -1,150 +1,110 @@
-import React, { useState } from 'react';
-import { Course, Semester, Lab, StudentGroup, User } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ClassInfo, ClassStudent, User } from '../types';
 import { useApp } from '../store/AppContext';
+import { classService } from '../services/classService';
 
 const CourseManagement: React.FC = () => {
-    const { users } = useApp();
+    const { users, classes, loadClasses, loadUsers } = useApp();
 
-    // Local state for courses (will be moved to context later)
-    const [courses, setCourses] = useState<Course[]>([]);
-
-    const [semesters, setSemesters] = useState<Semester[]>([]);
-
-    const [labs, setLabs] = useState<Lab[]>([]);
-
-    const [studentGroups, setStudentGroups] = useState<StudentGroup[]>([]);
-
-    const [expandedCourses, setExpandedCourses] = useState<string[]>(['course-1']);
-    const [expandedSemesters, setExpandedSemesters] = useState<string[]>(['sem-1']);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterDepartment, setFilterDepartment] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
 
     // Modal states
-    const [showCourseModal, setShowCourseModal] = useState(false);
-    const [showSemesterModal, setShowSemesterModal] = useState(false);
-    const [showLabModal, setShowLabModal] = useState(false);
-    const [showStudentModal, setShowStudentModal] = useState(false);
-    const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-    const [editingSemester, setEditingSemester] = useState<Semester | null>(null);
-    const [editingLab, setEditingLab] = useState<Lab | null>(null);
-    const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-    const [selectedSemesterId, setSelectedSemesterId] = useState<string | null>(null);
-    const [selectedLabId, setSelectedLabId] = useState<string | null>(null);
+    const [showClassModal, setShowClassModal] = useState(false);
+    const [showEnrollModal, setShowEnrollModal] = useState(false);
+    const [editingClass, setEditingClass] = useState<ClassInfo | null>(null);
+    const [enrollClassId, setEnrollClassId] = useState<string | null>(null);
+    const [enrolledStudents, setEnrolledStudents] = useState<ClassStudent[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
 
-    // Form states
-    const [courseForm, setCourseForm] = useState({ code: '', name: '', description: '', department: '', credits: 3 });
-    const [semesterForm, setSemesterForm] = useState({ name: '', year: 2026, term: 'fall' as const, startDate: '', endDate: '' });
-    const [labForm, setLabForm] = useState({ name: '', schedule: '', location: '', capacity: 30 });
+    // Form state
+    const [classForm, setClassForm] = useState({
+        name: '', code: '', description: '', department: '', teacherId: '',
+    });
+
+    useEffect(() => {
+        loadClasses();
+        loadUsers();
+    }, []);
 
     const students = users?.filter(u => u.role === 'student') || [];
-    const professors = users?.filter(u => u.role === 'professor') || [];
+    const teachers = users?.filter(u => u.role === 'professor') || [];
+    const departments = [...new Set(classes.map(c => c.department).filter(Boolean))];
 
-    const departments = [...new Set(courses.map(c => c.department))];
-
-    const filteredCourses = courses.filter(course => {
-        const matchesSearch = course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            course.code.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesDept = filterDepartment === 'all' || course.department === filterDepartment;
-        const matchesStatus = filterStatus === 'all' || course.status === filterStatus;
+    const filteredClasses = classes.filter(cls => {
+        const matchesSearch = cls.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            cls.code.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesDept = filterDepartment === 'all' || cls.department === filterDepartment;
+        const matchesStatus = filterStatus === 'all' || cls.status === filterStatus;
         return matchesSearch && matchesDept && matchesStatus;
     });
 
-    const toggleCourse = (courseId: string) => {
-        setExpandedCourses(prev =>
-            prev.includes(courseId) ? prev.filter(id => id !== courseId) : [...prev, courseId]
-        );
-    };
-
-    const toggleSemester = (semesterId: string) => {
-        setExpandedSemesters(prev =>
-            prev.includes(semesterId) ? prev.filter(id => id !== semesterId) : [...prev, semesterId]
-        );
-    };
-
-    const getSemestersForCourse = (courseId: string) => semesters.filter(s => s.courseId === courseId);
-    const getLabsForSemester = (semesterId: string) => labs.filter(l => l.semesterId === semesterId);
-    const getStudentsForLab = (labId: string) => {
-        const group = studentGroups.find(g => g.labId === labId);
-        if (!group) return [];
-        return students.filter(s => group.studentIds.includes(s.id));
-    };
-
-    const handleSaveCourse = () => {
-        if (editingCourse) {
-            setCourses(prev => prev.map(c => c.id === editingCourse.id ? { ...c, ...courseForm, updatedAt: new Date().toISOString() } : c));
-        } else {
-            const newCourse: Course = {
-                id: `course-${Date.now()}`,
-                ...courseForm,
-                status: 'active',
-                createdBy: 'admin',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            };
-            setCourses(prev => [...prev, newCourse]);
-        }
-        setShowCourseModal(false);
-        setCourseForm({ code: '', name: '', description: '', department: '', credits: 3 });
-        setEditingCourse(null);
-    };
-
-    const handleSaveSemester = () => {
-        if (!selectedCourseId) return;
-        if (editingSemester) {
-            setSemesters(prev => prev.map(s => s.id === editingSemester.id ? { ...s, ...semesterForm } : s));
-        } else {
-            const newSemester: Semester = {
-                id: `sem-${Date.now()}`,
-                courseId: selectedCourseId,
-                ...semesterForm,
-                status: 'upcoming',
-            };
-            setSemesters(prev => [...prev, newSemester]);
-        }
-        setShowSemesterModal(false);
-        setSemesterForm({ name: '', year: 2026, term: 'fall', startDate: '', endDate: '' });
-        setEditingSemester(null);
-    };
-
-    const handleSaveLab = () => {
-        if (!selectedSemesterId) return;
-        if (editingLab) {
-            setLabs(prev => prev.map(l => l.id === editingLab.id ? { ...l, ...labForm } : l));
-        } else {
-            const newLab: Lab = {
-                id: `lab-${Date.now()}`,
-                semesterId: selectedSemesterId,
-                ...labForm,
-                status: 'active',
-            };
-            setLabs(prev => [...prev, newLab]);
-        }
-        setShowLabModal(false);
-        setLabForm({ name: '', schedule: '', location: '', capacity: 30 });
-        setEditingLab(null);
-    };
-
-    const handleDeleteCourse = (courseId: string) => {
-        if (confirm('Delete this course and all its semesters/labs?')) {
-            const semIds = semesters.filter(s => s.courseId === courseId).map(s => s.id);
-            setLabs(prev => prev.filter(l => !semIds.includes(l.semesterId)));
-            setSemesters(prev => prev.filter(s => s.courseId !== courseId));
-            setCourses(prev => prev.filter(c => c.id !== courseId));
+    const handleSaveClass = async () => {
+        if (!classForm.name || !classForm.code || !classForm.teacherId) return;
+        setIsSubmitting(true);
+        setErrorMsg('');
+        try {
+            if (editingClass) {
+                await classService.update(editingClass.id, classForm);
+            } else {
+                await classService.create(classForm);
+            }
+            await loadClasses();
+            setShowClassModal(false);
+            setClassForm({ name: '', code: '', description: '', department: '', teacherId: '' });
+            setEditingClass(null);
+        } catch (err: any) {
+            setErrorMsg(err?.message || 'Failed to save class');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleDeleteSemester = (semesterId: string) => {
-        if (confirm('Delete this semester and all its labs?')) {
-            setLabs(prev => prev.filter(l => l.semesterId !== semesterId));
-            setSemesters(prev => prev.filter(s => s.id !== semesterId));
+    const handleDeleteClass = async (id: string) => {
+        if (!confirm('Delete this class? Students will be unenrolled.')) return;
+        try {
+            await classService.remove(id);
+            await loadClasses();
+        } catch (err: any) {
+            alert(err?.message || 'Failed to delete class');
         }
     };
 
-    const handleDeleteLab = (labId: string) => {
-        if (confirm('Delete this lab section?')) {
-            setStudentGroups(prev => prev.filter(g => g.labId !== labId));
-            setLabs(prev => prev.filter(l => l.id !== labId));
+    const openEnrollModal = async (classId: string) => {
+        setEnrollClassId(classId);
+        setShowEnrollModal(true);
+        try {
+            const enrolled = await classService.getStudents(classId);
+            setEnrolledStudents(enrolled);
+        } catch {
+            setEnrolledStudents([]);
+        }
+    };
+
+    const toggleEnroll = async (studentId: string) => {
+        if (!enrollClassId) return;
+        const isEnrolled = enrolledStudents.some(s => s.id === studentId);
+        try {
+            if (isEnrolled) {
+                await classService.unenrollStudent(enrollClassId, studentId);
+                setEnrolledStudents(prev => prev.filter(s => s.id !== studentId));
+            } else {
+                await classService.enrollStudents(enrollClassId, [studentId]);
+                const student = students.find(s => s.id === studentId);
+                if (student) {
+                    setEnrolledStudents(prev => [...prev, {
+                        enrollmentRecordId: '', enrolledAt: new Date().toISOString(),
+                        id: student.id, name: student.name, email: student.email,
+                        enrollmentId: student.enrollmentId || '', department: student.department || '',
+                        avatar: student.avatar || '', status: 'active',
+                    }]);
+                }
+            }
+            loadClasses(); // refresh counts
+        } catch (err: any) {
+            alert(err?.message || 'Enrollment update failed');
         }
     };
 
@@ -152,9 +112,6 @@ const CourseManagement: React.FC = () => {
         const styles: Record<string, string> = {
             active: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
             archived: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
-            upcoming: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-            completed: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-            inactive: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
         };
         return <span className={`px-2 py-0.5 rounded-full text-xs font-bold capitalize ${styles[status] || styles.active}`}>{status}</span>;
     };
@@ -164,15 +121,15 @@ const CourseManagement: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold">Course Management</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Manage courses, semesters, labs, and student groups</p>
+                    <h1 className="text-3xl font-bold">Class Management</h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Manage classes, assign teachers, and enroll students</p>
                 </div>
                 <button
-                    onClick={() => { setCourseForm({ code: '', name: '', description: '', department: '', credits: 3 }); setEditingCourse(null); setShowCourseModal(true); }}
+                    onClick={() => { setClassForm({ name: '', code: '', description: '', department: '', teacherId: '' }); setEditingClass(null); setErrorMsg(''); setShowClassModal(true); }}
                     className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
                 >
                     <span className="material-symbols-outlined">add</span>
-                    Create Course
+                    Create Class
                 </button>
             </div>
 
@@ -183,29 +140,17 @@ const CourseManagement: React.FC = () => {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                             <span className="material-symbols-outlined">search</span>
                         </span>
-                        <input
-                            type="text"
-                            placeholder="Search courses..."
-                            value={searchQuery}
+                        <input type="text" placeholder="Search classes..." value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                        />
+                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800" />
                     </div>
-                    <select
-                        value={filterDepartment}
-                        onChange={(e) => setFilterDepartment(e.target.value)}
-                        className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                    >
+                    <select value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}
+                        className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800">
                         <option value="all">All Departments</option>
-                        {departments.map(dept => (
-                            <option key={dept} value={dept}>{dept}</option>
-                        ))}
+                        {departments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
                     </select>
-                    <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-                    >
+                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                        className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800">
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
                         <option value="archived">Archived</option>
@@ -214,12 +159,11 @@ const CourseManagement: React.FC = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                    { label: 'Total Courses', value: courses.length, icon: 'school', color: 'bg-primary/10 text-primary' },
-                    { label: 'Active Semesters', value: semesters.filter(s => s.status === 'active').length, icon: 'calendar_month', color: 'bg-green-500/10 text-green-500' },
-                    { label: 'Lab Sections', value: labs.length, icon: 'science', color: 'bg-blue-500/10 text-blue-500' },
-                    { label: 'Enrolled Students', value: studentGroups.reduce((acc, g) => acc + g.studentIds.length, 0), icon: 'groups', color: 'bg-purple-500/10 text-purple-500' },
+                    { label: 'Total Classes', value: classes.length, icon: 'school', color: 'bg-primary/10 text-primary' },
+                    { label: 'Active Classes', value: classes.filter(c => c.status === 'active').length, icon: 'check_circle', color: 'bg-green-500/10 text-green-500' },
+                    { label: 'Total Enrolled', value: classes.reduce((acc, c) => acc + c.studentCount, 0), icon: 'groups', color: 'bg-purple-500/10 text-purple-500' },
                 ].map(stat => (
                     <div key={stat.label} className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-4">
                         <div className="flex items-center justify-between">
@@ -235,226 +179,122 @@ const CourseManagement: React.FC = () => {
                 ))}
             </div>
 
-            {/* Course List - Tree View */}
+            {/* Class List */}
             <div className="space-y-3">
-                {filteredCourses.length === 0 ? (
+                {filteredClasses.length === 0 ? (
                     <div className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center">
                         <span className="material-symbols-outlined text-5xl text-slate-300 mb-4">school</span>
-                        <h3 className="text-xl font-bold mb-2">No courses found</h3>
-                        <p className="text-slate-500">Create your first course to get started</p>
+                        <h3 className="text-xl font-bold mb-2">No classes found</h3>
+                        <p className="text-slate-500">Create your first class to get started</p>
                     </div>
                 ) : (
-                    filteredCourses.map(course => (
-                        <div key={course.id} className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                            {/* Course Header */}
-                            <div
-                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                                onClick={() => toggleCourse(course.id)}
-                            >
+                    filteredClasses.map(cls => (
+                        <div key={cls.id} className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+                            <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-slate-400 transition-transform" style={{ transform: expandedCourses.includes(course.id) ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                                        chevron_right
-                                    </span>
                                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                                         <span className="material-symbols-outlined text-primary">school</span>
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-lg">{course.code}</span>
+                                            <span className="font-bold text-lg">{cls.code}</span>
                                             <span className="text-slate-400">-</span>
-                                            <span className="font-medium">{course.name}</span>
-                                            {getStatusBadge(course.status)}
+                                            <span className="font-medium">{cls.name}</span>
+                                            {getStatusBadge(cls.status)}
                                         </div>
-                                        <p className="text-sm text-slate-500">{course.department} • {course.credits} credits • {getSemestersForCourse(course.id).length} semesters</p>
+                                        <p className="text-sm text-slate-500">
+                                            {cls.department && `${cls.department} • `}
+                                            Teacher: {cls.teacherName || 'Unassigned'} • {cls.studentCount} students
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                        onClick={() => { setSelectedCourseId(course.id); setSemesterForm({ name: '', year: 2026, term: 'fall', startDate: '', endDate: '' }); setShowSemesterModal(true); }}
-                                        className="p-2 hover:bg-primary/10 rounded-lg text-primary"
-                                        title="Add Semester"
-                                    >
-                                        <span className="material-symbols-outlined">add_circle</span>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => openEnrollModal(cls.id)}
+                                        className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20">
+                                        Manage Students
                                     </button>
-                                    <button
-                                        onClick={() => { setEditingCourse(course); setCourseForm({ code: course.code, name: course.name, description: course.description, department: course.department, credits: course.credits }); setShowCourseModal(true); }}
-                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-                                        title="Edit"
-                                    >
+                                    <button onClick={() => {
+                                        setEditingClass(cls);
+                                        setClassForm({ name: cls.name, code: cls.code, description: cls.description, department: cls.department, teacherId: cls.teacherId });
+                                        setErrorMsg('');
+                                        setShowClassModal(true);
+                                    }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg" title="Edit">
                                         <span className="material-symbols-outlined">edit</span>
                                     </button>
-                                    <button
-                                        onClick={() => handleDeleteCourse(course.id)}
-                                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500"
-                                        title="Delete"
-                                    >
+                                    <button onClick={() => handleDeleteClass(cls.id)}
+                                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500" title="Delete">
                                         <span className="material-symbols-outlined">delete</span>
                                     </button>
                                 </div>
                             </div>
-
-                            {/* Semesters */}
-                            {expandedCourses.includes(course.id) && (
-                                <div className="border-t border-slate-200 dark:border-slate-700">
-                                    {getSemestersForCourse(course.id).map(semester => (
-                                        <div key={semester.id} className="ml-8 border-l-2 border-slate-200 dark:border-slate-700">
-                                            {/* Semester Header */}
-                                            <div
-                                                className="flex items-center justify-between p-3 pl-6 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                                                onClick={() => toggleSemester(semester.id)}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <span className="material-symbols-outlined text-slate-400 transition-transform text-sm" style={{ transform: expandedSemesters.includes(semester.id) ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                                                        chevron_right
-                                                    </span>
-                                                    <span className="material-symbols-outlined text-blue-500">calendar_month</span>
-                                                    <div>
-                                                        <span className="font-medium">{semester.name}</span>
-                                                        {getStatusBadge(semester.status)}
-                                                    </div>
-                                                    <span className="text-sm text-slate-400">{getLabsForSemester(semester.id).length} labs</span>
-                                                </div>
-                                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                                    <button
-                                                        onClick={() => { setSelectedSemesterId(semester.id); setLabForm({ name: '', schedule: '', location: '', capacity: 30 }); setShowLabModal(true); }}
-                                                        className="p-1.5 hover:bg-primary/10 rounded text-primary text-sm"
-                                                        title="Add Lab"
-                                                    >
-                                                        <span className="material-symbols-outlined text-lg">add</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteSemester(semester.id)}
-                                                        className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-500 text-sm"
-                                                        title="Delete"
-                                                    >
-                                                        <span className="material-symbols-outlined text-lg">delete</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* Labs */}
-                                            {expandedSemesters.includes(semester.id) && (
-                                                <div className="ml-8 border-l-2 border-slate-200 dark:border-slate-700">
-                                                    {getLabsForSemester(semester.id).map(lab => (
-                                                        <div key={lab.id} className="flex items-center justify-between p-3 pl-6 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="material-symbols-outlined text-green-500">science</span>
-                                                                <div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="font-medium">{lab.name}</span>
-                                                                        <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">{lab.schedule}</span>
-                                                                    </div>
-                                                                    <p className="text-sm text-slate-500">{lab.location} • Capacity: {lab.capacity} • {getStudentsForLab(lab.id).length} enrolled</p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-1">
-                                                                <button
-                                                                    onClick={() => { setSelectedLabId(lab.id); setShowStudentModal(true); }}
-                                                                    className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20"
-                                                                >
-                                                                    Manage Students
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteLab(lab.id)}
-                                                                    className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-500"
-                                                                >
-                                                                    <span className="material-symbols-outlined text-lg">delete</span>
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                    {getLabsForSemester(semester.id).length === 0 && (
-                                                        <p className="p-3 pl-6 text-sm text-slate-400 italic">No lab sections yet</p>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {getSemestersForCourse(course.id).length === 0 && (
-                                        <p className="p-4 ml-8 text-sm text-slate-400 italic">No semesters yet. Click + to add one.</p>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     ))
                 )}
             </div>
 
-            {/* Course Modal */}
-            {showCourseModal && (
+            {/* Create/Edit Class Modal */}
+            {showClassModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-2xl font-bold">{editingCourse ? 'Edit Course' : 'Create Course'}</h3>
-                            <button onClick={() => setShowCourseModal(false)} className="text-slate-400 hover:text-slate-600">
+                            <h3 className="text-2xl font-bold">{editingClass ? 'Edit Class' : 'Create Class'}</h3>
+                            <button onClick={() => setShowClassModal(false)} className="text-slate-400 hover:text-slate-600">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-semibold mb-2">Course Code *</label>
-                                    <input
-                                        type="text"
-                                        value={courseForm.code}
-                                        onChange={(e) => setCourseForm(prev => ({ ...prev, code: e.target.value }))}
+                                    <label className="block text-sm font-semibold mb-2">Class Code *</label>
+                                    <input type="text" value={classForm.code}
+                                        onChange={(e) => setClassForm(prev => ({ ...prev, code: e.target.value }))}
                                         className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                        placeholder="CS201"
-                                    />
+                                        placeholder="CS201-A" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold mb-2">Credits</label>
-                                    <input
-                                        type="number"
-                                        value={courseForm.credits}
-                                        onChange={(e) => setCourseForm(prev => ({ ...prev, credits: parseInt(e.target.value) }))}
+                                    <label className="block text-sm font-semibold mb-2">Department</label>
+                                    <input type="text" value={classForm.department}
+                                        onChange={(e) => setClassForm(prev => ({ ...prev, department: e.target.value }))}
                                         className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                    />
+                                        placeholder="Computer Science" />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold mb-2">Course Name *</label>
-                                <input
-                                    type="text"
-                                    value={courseForm.name}
-                                    onChange={(e) => setCourseForm(prev => ({ ...prev, name: e.target.value }))}
+                                <label className="block text-sm font-semibold mb-2">Class Name *</label>
+                                <input type="text" value={classForm.name}
+                                    onChange={(e) => setClassForm(prev => ({ ...prev, name: e.target.value }))}
                                     className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                    placeholder="Data Structures"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold mb-2">Department *</label>
-                                <input
-                                    type="text"
-                                    value={courseForm.department}
-                                    onChange={(e) => setCourseForm(prev => ({ ...prev, department: e.target.value }))}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                    placeholder="Computer Science"
-                                />
+                                    placeholder="Data Structures Section A" />
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold mb-2">Description</label>
-                                <textarea
-                                    value={courseForm.description}
-                                    onChange={(e) => setCourseForm(prev => ({ ...prev, description: e.target.value }))}
+                                <textarea value={classForm.description}
+                                    onChange={(e) => setClassForm(prev => ({ ...prev, description: e.target.value }))}
                                     className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                    rows={3}
-                                    placeholder="Course description..."
-                                />
+                                    rows={2} placeholder="Class description..." />
                             </div>
+                            <div>
+                                <label className="block text-sm font-semibold mb-2">Assign Teacher *</label>
+                                <select value={classForm.teacherId}
+                                    onChange={(e) => setClassForm(prev => ({ ...prev, teacherId: e.target.value }))}
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700">
+                                    <option value="">Select a teacher...</option>
+                                    {teachers.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} ({t.email})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {errorMsg && <p className="text-red-500 text-sm">{errorMsg}</p>}
                             <div className="flex gap-3 pt-4">
-                                <button
-                                    onClick={() => setShowCourseModal(false)}
-                                    className="flex-1 px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg font-medium"
-                                >
+                                <button onClick={() => setShowClassModal(false)}
+                                    disabled={isSubmitting}
+                                    className="flex-1 px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg font-medium disabled:opacity-50">
                                     Cancel
                                 </button>
-                                <button
-                                    onClick={handleSaveCourse}
-                                    disabled={!courseForm.code || !courseForm.name || !courseForm.department}
-                                    className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-bold disabled:opacity-50"
-                                >
-                                    {editingCourse ? 'Save Changes' : 'Create Course'}
+                                <button onClick={handleSaveClass}
+                                    disabled={!classForm.name || !classForm.code || !classForm.teacherId || isSubmitting}
+                                    className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-bold disabled:opacity-50">
+                                    {isSubmitting ? 'Saving...' : editingClass ? 'Save Changes' : 'Create Class'}
                                 </button>
                             </div>
                         </div>
@@ -462,42 +302,59 @@ const CourseManagement: React.FC = () => {
                 </div>
             )}
 
-            {/* Semester Modal */}
-            {showSemesterModal && (
+            {/* Student Enrollment Modal */}
+            {showEnrollModal && enrollClassId && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[80vh] overflow-hidden flex flex-col">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-2xl font-bold">Add Semester</h3>
-                            <button onClick={() => setShowSemesterModal(false)} className="text-slate-400 hover:text-slate-600">
+                            <h3 className="text-2xl font-bold">Manage Students</h3>
+                            <button onClick={() => { setShowEnrollModal(false); setEnrollClassId(null); }} className="text-slate-400 hover:text-slate-600">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold mb-2">Year</label>
-                                    <input
-                                        type="number"
-                                        value={semesterForm.year}
-                                        onChange={(e) => setSemesterForm(prev => ({ ...prev, year: parseInt(e.target.value) }))}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold mb-2">Term</label>
-                                    <select
-                                        value={semesterForm.term}
-                                        onChange={(e) => {
-                                            const term = e.target.value as 'spring' | 'summer' | 'fall' | 'winter';
-                                            setSemesterForm(prev => ({ ...prev, term, name: `${term.charAt(0).toUpperCase() + term.slice(1)} ${prev.year}` }));
-                                        }}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700"
-                                    >
-                                        <option value="spring">Spring</option>
-                                        <option value="summer">Summer</option>
-                                        <option value="fall">Fall</option>
-                                        <option value="winter">Winter</option>
-                                    </select>
+                        <div className="flex-1 overflow-y-auto">
+                            <p className="text-sm text-slate-500 mb-4">Toggle students to enroll/unenroll from this class:</p>
+                            <div className="space-y-2">
+                                {students.map(student => {
+                                    const isEnrolled = enrolledStudents.some(e => e.id === student.id);
+                                    return (
+                                        <label key={student.id}
+                                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${isEnrolled
+                                                ? 'bg-primary/10 border-primary'
+                                                : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 hover:border-primary/50'
+                                            }`}>
+                                            <input type="checkbox" checked={isEnrolled}
+                                                onChange={() => toggleEnroll(student.id)}
+                                                className="w-4 h-4 rounded border-slate-300" />
+                                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
+                                                {student.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium">{student.name}</p>
+                                                <p className="text-sm text-slate-500">{student.email}{student.enrollmentId ? ` • ${student.enrollmentId}` : ''}</p>
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                                {students.length === 0 && (
+                                    <p className="text-center text-slate-400 py-8">No students available. Create student accounts first.</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
+                            <button onClick={() => { setShowEnrollModal(false); setEnrollClassId(null); }}
+                                className="w-full px-4 py-2.5 bg-primary text-white rounded-lg font-bold">
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default CourseManagement;
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">

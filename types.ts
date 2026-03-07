@@ -517,3 +517,31 @@ export interface StudentGroup {
   createdAt: string;
 }
 
+export interface ClassInfo {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  department: string;
+  teacherId: string;
+  teacherName: string;
+  teacherEmail: string;
+  status: 'active' | 'archived';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  studentCount: number;
+}
+
+export interface ClassStudent {
+  enrollmentRecordId: string;
+  enrolledAt: string;
+  id: string;
+  name: string;
+  email: string;
+  enrollmentId: string;
+  department: string;
+  avatar: string;
+  status: string;
+}
+

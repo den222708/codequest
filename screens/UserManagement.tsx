@@ -1,22 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Role } from '../types';
 import { useApp } from '../store/AppContext';
+import type { CreateUserResult } from '../services/userService';
 
 interface Props {
   users: User[];
-  onAddUser: (user: Omit<User, 'id' | 'createdAt'>) => void;
-  onUpdateUser: (id: string, updates: Partial<User>) => void;
-  onDeleteUser: (id: string) => void;
+  onAddUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<CreateUserResult>;
+  onUpdateUser: (id: string, updates: Partial<User>) => Promise<void>;
+  onDeleteUser: (id: string) => Promise<void>;
 }
 
 const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDeleteUser }) => {
-  const { currentUser, hasPermission } = useApp();
+  const { currentUser, hasPermission, loadUsers } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
+  const [createdUserName, setCreatedUserName] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -28,6 +33,8 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
     employeeId: '',
     status: 'active' as 'active' | 'inactive' | 'pending',
   });
+
+  useEffect(() => { loadUsers(); }, []);
 
   // Sub admins can only see/manage students and professors (not admins)
   const canManageAdmins = hasPermission('canManageAdmins');
@@ -43,26 +50,40 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  const handleCreateUser = () => {
-    onAddUser({
-      name: formData.name,
-      email: formData.email,
-      role: formData.role,
-      department: formData.department,
-      enrollmentId: formData.enrollmentId || undefined,
-      employeeId: formData.employeeId || undefined,
-      status: formData.status,
-      avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase(),
-    });
-    setShowCreateModal(false);
-    resetForm();
-  };
-
-  const handleUpdateUser = () => {
-    if (editingUser) {
-      onUpdateUser(editingUser.id, {
+  const handleCreateUser = async () => {
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      const result = await onAddUser({
         name: formData.name,
         email: formData.email,
+        role: formData.role,
+        department: formData.department,
+        enrollmentId: formData.enrollmentId || undefined,
+        employeeId: formData.employeeId || undefined,
+        status: formData.status,
+        avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase(),
+      });
+      setShowCreateModal(false);
+      resetForm();
+      if (result.generatedPassword) {
+        setCreatedUserName(result.user.name);
+        setCreatedPassword(result.generatedPassword);
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to create user');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      await onUpdateUser(editingUser.id, {
+        name: formData.name,
         role: formData.role,
         department: formData.department,
         enrollmentId: formData.enrollmentId || undefined,
@@ -71,10 +92,15 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
       });
       setEditingUser(null);
       resetForm();
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to update user');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const openEditModal = (user: User) => {
+    setErrorMsg('');
     setFormData({
       name: user.name,
       email: user.email,
@@ -88,6 +114,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
   };
 
   const resetForm = () => {
+    setErrorMsg('');
     setFormData({
       name: '',
       email: '',
@@ -402,20 +429,57 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
             </div>
 
             <div className="flex gap-3 mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+              {errorMsg && (
+                <p className="text-red-500 text-sm flex-1 flex items-center">{errorMsg}</p>
+              )}
               <button
                 onClick={() => { setShowCreateModal(false); setEditingUser(null); resetForm(); }}
-                className="flex-1 px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 font-medium"
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 font-medium disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={editingUser ? handleUpdateUser : handleCreateUser}
-                disabled={!formData.name || !formData.email}
+                disabled={!formData.name || !formData.email || isSubmitting}
                 className="flex-1 px-4 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold disabled:opacity-50"
               >
-                {editingUser ? 'Update User' : 'Create User'}
+                {isSubmitting ? 'Saving...' : editingUser ? 'Update User' : 'Create User'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generated Password Modal */}
+      {createdPassword && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-green-500">check_circle</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">Account Created</h3>
+                <p className="text-sm text-slate-500">Save these credentials — the password won't be shown again.</p>
+              </div>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2 mb-4">
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">Name</span>
+                <span className="font-medium">{createdUserName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">Password</span>
+                <span className="font-mono font-bold text-primary">{createdPassword}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => { setCreatedPassword(null); setCreatedUserName(''); }}
+              className="w-full px-4 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
@@ -441,7 +505,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
                 Cancel
               </button>
               <button
-                onClick={() => { onDeleteUser(deleteUserId); setDeleteUserId(null); }}
+                onClick={async () => { try { await onDeleteUser(deleteUserId); } catch {} setDeleteUserId(null); }}
                 className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold"
               >
                 Delete

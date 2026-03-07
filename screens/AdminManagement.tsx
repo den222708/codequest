@@ -4,9 +4,9 @@ import { useApp } from '../store/AppContext';
 
 interface AdminManagementProps {
     users: User[];
-    onAddUser: (user: Omit<User, 'id' | 'createdAt'>) => void;
-    onUpdateUser: (id: string, updates: Partial<User>) => void;
-    onDeleteUser: (id: string) => void;
+    onAddUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<any>;
+    onUpdateUser: (id: string, updates: Partial<User>) => Promise<void>;
+    onDeleteUser: (id: string) => Promise<void>;
 }
 
 const AdminManagement: React.FC<AdminManagementProps> = ({

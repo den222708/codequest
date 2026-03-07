@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { User, Role, Notification, Question, Assessment, Submission, AssessmentAttempt, SystemLog, SystemHealth, Backup, LeaderboardEntry, PlagiarismResult, ActiveSession, RolePermissions, ROLE_PERMISSIONS } from '../types';
+import { User, Role, Notification, Question, Assessment, Submission, AssessmentAttempt, SystemLog, SystemHealth, Backup, LeaderboardEntry, PlagiarismResult, ActiveSession, RolePermissions, ROLE_PERMISSIONS, ClassInfo } from '../types';
 
 import { demoAssessment, demoQuestions, demoStudentUser } from '../data/demoModeData';
 import { authService } from '../services/authService';
@@ -7,6 +7,8 @@ import { assessmentService } from '../services/assessmentService';
 import { questionService } from '../services/questionService';
 import { submissionService } from '../services/submissionService';
 import { executeService } from '../services/executeService';
+import { userService, CreateUserResult } from '../services/userService';
+import { classService } from '../services/classService';
 import { ApiError, tokenStore } from '../services/apiClient';
 
 interface AppState {
@@ -16,6 +18,7 @@ interface AppState {
 
   // Data
   users: User[];
+  classes: ClassInfo[];
   questions: Question[];
   assessments: Assessment[];
   notifications: Notification[];
@@ -54,9 +57,13 @@ interface AppContextType extends AppState {
   startDemoMode: () => Promise<void>;
 
   // User Actions
-  addUser: (user: Omit<User, 'id' | 'createdAt'>) => void;
-  updateUser: (id: string, updates: Partial<User>) => void;
-  deleteUser: (id: string) => void;
+  addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<CreateUserResult>;
+  updateUser: (id: string, updates: Partial<User>) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  loadUsers: () => Promise<void>;
+
+  // Class Actions
+  loadClasses: () => Promise<void>;
 
   // Question Actions
   addQuestion: (question: Omit<Question, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => void;
@@ -108,6 +115,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     isAuthenticated: false,
     currentUser: null,
     users: [],
+    classes: [],
     questions: [],
     assessments: [],
     notifications: [],
@@ -159,14 +167,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const loadData = async (user?: User | null) => {
     try {
       const current = user || state.currentUser;
-      const [questions, assessments, submissions] = await Promise.all([
+      const isAdmin = current?.role === 'admin' || current?.role === 'superadmin' || current?.role === 'subadmin';
+      const [questions, assessments, submissions, users, classes] = await Promise.all([
         questionService.getAll().catch(() => []),
         assessmentService.getAll().catch(() => []),
         current
           ? submissionService.getAll(current.role === 'student' ? { userId: current.id } : undefined).catch(() => [])
           : Promise.resolve([]),
+        isAdmin ? userService.getAll().catch(() => []) : Promise.resolve([]),
+        (isAdmin || current?.role === 'professor') ? classService.getAll().catch(() => []) : Promise.resolve([]),
       ]);
-      setState(prev => ({ ...prev, questions, assessments, submissions }));
+      setState(prev => ({ ...prev, questions, assessments, submissions, users, classes }));
     } catch (err) {
       console.error('Failed to load data:', err);
     }
@@ -288,27 +299,63 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // User Actions
-  const addUser = (user: Omit<User, 'id' | 'createdAt'>) => {
-    const newUser: User = {
-      ...user,
-      id: `user-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-    };
-    setState(prev => ({ ...prev, users: [...prev.users, newUser] }));
+  const loadUsers = async () => {
+    try {
+      const users = await userService.getAll();
+      setState(prev => ({ ...prev, users }));
+    } catch (err) {
+      console.error('Failed to load users:', err);
+    }
   };
 
-  const updateUser = (id: string, updates: Partial<User>) => {
-    setState(prev => ({
-      ...prev,
-      users: prev.users.map(u => u.id === id ? { ...u, ...updates } : u)
-    }));
+  const addUser = async (user: Omit<User, 'id' | 'createdAt'>): Promise<CreateUserResult> => {
+    const result = await userService.create({
+      name: user.name,
+      email: user.email,
+      role: user.role as string,
+      department: user.department,
+      enrollmentId: user.enrollmentId || user.employeeId,
+    });
+    setState(prev => ({ ...prev, users: [...prev.users, result.user] }));
+    addNotification({ type: 'success', title: 'User Created', message: `Account for ${result.user.name} created successfully.` });
+    return result;
   };
 
-  const deleteUser = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      users: prev.users.filter(u => u.id !== id)
-    }));
+  const updateUser = async (id: string, updates: Partial<User>): Promise<void> => {
+    try {
+      const updated = await userService.update(id, updates);
+      setState(prev => ({
+        ...prev,
+        users: prev.users.map(u => u.id === id ? updated : u)
+      }));
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      throw err;
+    }
+  };
+
+  const deleteUser = async (id: string): Promise<void> => {
+    try {
+      await userService.remove(id);
+      setState(prev => ({
+        ...prev,
+        users: prev.users.filter(u => u.id !== id)
+      }));
+      addNotification({ type: 'success', title: 'User Deleted', message: 'User account has been removed.' });
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      throw err;
+    }
+  };
+
+  // Class Actions
+  const loadClasses = async () => {
+    try {
+      const classes = await classService.getAll();
+      setState(prev => ({ ...prev, classes }));
+    } catch (err) {
+      console.error('Failed to load classes:', err);
+    }
   };
 
   // Question Actions
@@ -744,6 +791,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       addUser,
       updateUser,
       deleteUser,
+      loadUsers,
+      loadClasses,
       addQuestion,
       updateQuestion,
       deleteQuestion,
