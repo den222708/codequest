@@ -6,7 +6,7 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.PROD
-    ? 'https://api.bennett.codequest.qzz.io/api/v1'
+    ? 'https://bennett-api.codequest.qzz.io/api/v1'
     : 'http://localhost:3001/api/v1');
 
 // Token storage
