@@ -40,16 +40,19 @@ app.use(
 app.use("*", rateLimit({ max: 200, windowMs: 60_000, keyPrefix: "global" }));
 
 // ── Routes ────────────────────────────────────────────────────────────
-app.route("/auth", authRoutes);
-app.route("/users", userRoutes);
-app.route("/questions", questionRoutes);
-app.route("/assessments", assessmentRoutes);
-app.route("/submissions", submissionRoutes);
-app.route("/execute", executeRoutes);
-app.route("/analytics", analyticsRoutes);
-app.route("/system", systemRoutes);
-app.route("/classes", classRoutes);
-app.route("/admin", adminRoutes);
+const api = new Hono();
+api.route("/auth", authRoutes);
+api.route("/users", userRoutes);
+api.route("/questions", questionRoutes);
+api.route("/assessments", assessmentRoutes);
+api.route("/submissions", submissionRoutes);
+api.route("/execute", executeRoutes);
+api.route("/analytics", analyticsRoutes);
+api.route("/system", systemRoutes);
+api.route("/classes", classRoutes);
+api.route("/admin", adminRoutes);
+
+app.route("/api/v1", api);
 
 // ── Root ──────────────────────────────────────────────────────────────
 app.get("/", (c) =>
