@@ -16,7 +16,7 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+
 
   useEffect(() => {
     if (currentUser) {
@@ -51,39 +51,12 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = async (role: 'student' | 'professor' | 'admin' | 'subadmin' | 'superadmin') => {
-    const demoAccounts = {
-      student: { email: 'alex@university.edu', password: 'password123' },
-      professor: { email: 'turing@university.edu', password: 'password123' },
-      subadmin: { email: 'subadmin@university.edu', password: 'password123' },
-      admin: { email: 'admin@university.edu', password: 'password123' },
-      superadmin: { email: 'superadmin@university.edu', password: 'password123' },
-    };
-    setEmail(demoAccounts[role].email);
-    setPassword(demoAccounts[role].password);
-    setLoading(true);
-    const success = await login(demoAccounts[role].email, demoAccounts[role].password);
-    if (success) {
-      const dashboardPath =
-        role === 'student' ? '/student/dashboard' :
-          role === 'professor' ? '/professor/dashboard' :
-            '/admin/dashboard';
-      navigate(dashboardPath, { replace: true });
-    }
-    setLoading(false);
-  };
+
 
   return (
     <div className="min-h-screen flex bg-background-light dark:bg-background-dark">
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary via-primary-dark to-[#0a4f5c]">
-        {/* Animated Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-white rounded-full translate-x-1/3 translate-y-1/3"></div>
-          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 animate-ping" style={{ animationDuration: '3s' }}></div>
-        </div>
-
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           <div>
@@ -144,39 +117,6 @@ const Login: React.FC = () => {
             <p className="text-slate-500 dark:text-slate-400 mt-2">Sign in to continue to your dashboard</p>
           </div>
 
-          {/* Demo Login Buttons */}
-          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">Quick Demo Access</p>
-            <div className="grid grid-cols-5 gap-2">
-              {[
-                { role: 'student' as const, icon: 'school', label: 'Student', color: 'text-blue-500' },
-                { role: 'professor' as const, icon: 'co_present', label: 'Professor', color: 'text-purple-500' },
-                { role: 'subadmin' as const, icon: 'shield_person', label: 'Sub Admin', color: 'text-teal-500' },
-                { role: 'admin' as const, icon: 'admin_panel_settings', label: 'Admin', color: 'text-amber-500' },
-                { role: 'superadmin' as const, icon: 'security', label: 'Super', color: 'text-red-500' },
-              ].map((demo) => (
-                <button
-                  key={demo.role}
-                  onClick={() => handleDemoLogin(demo.role)}
-                  disabled={loading}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-primary hover:bg-primary/5 transition-all hover:text-primary disabled:opacity-50`}
-                >
-                  <span className={`material-symbols-outlined text-lg ${demo.color}`}>{demo.icon}</span>
-                  <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300">{demo.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-background-light dark:bg-background-dark text-slate-500">or sign in with email</span>
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
@@ -232,16 +172,7 @@ const Login: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
-                />
-                <span className="text-sm text-slate-600 dark:text-slate-400">Remember me</span>
-              </label>
+            <div className="flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => navigate('/forgot-password')}
