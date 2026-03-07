@@ -458,6 +458,7 @@ function mapClass(row: any) {
     teacherName: row.profiles?.name ?? "",
     teacherEmail: row.profiles?.email ?? "",
     status: row.status,
+    schedule: row.schedule ?? "",
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
