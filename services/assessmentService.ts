@@ -96,7 +96,7 @@ export const assessmentService = {
     const body = {
       title: assessment.title,
       description: assessment.description,
-      type: assessment.type?.toUpperCase(),
+      type: assessment.type?.toLowerCase(),
       difficulty: mapDifficultyToBackend(assessment.difficulty),
       duration: assessment.duration,
       passingScore: assessment.passingScore,
@@ -107,7 +107,7 @@ export const assessmentService = {
       courseCode: assessment.courseCode,
       courseName: assessment.courseName,
       professorName: assessment.professorName,
-      status: assessment.status?.toUpperCase() || 'DRAFT',
+      status: assessment.status?.toLowerCase() || 'draft',
       questionIds: assessment.questionIds || assessment.questions?.map(q => q.id) || [],
     };
     const data = await api.post('/assessments', body);
@@ -116,16 +116,16 @@ export const assessmentService = {
 
   async update(id: string, updates: Partial<Assessment>): Promise<Assessment> {
     const body: any = {};
-    if (updates.title) body.title = updates.title;
-    if (updates.description) body.description = updates.description;
-    if (updates.type) body.type = updates.type.toUpperCase();
+    if (updates.title !== undefined) body.title = updates.title;
+    if (updates.description !== undefined) body.description = updates.description;
+    if (updates.type) body.type = updates.type.toLowerCase();
     if (updates.difficulty) body.difficulty = mapDifficultyToBackend(updates.difficulty);
-    if (updates.duration) body.duration = updates.duration;
-    if (updates.passingScore) body.passingScore = updates.passingScore;
-    if (updates.startDate) body.startDate = updates.startDate;
-    if (updates.endDate) body.endDate = updates.endDate;
-    if (updates.status) body.status = updates.status.toUpperCase();
-    if (updates.settings) body.settings = updates.settings;
+    if (updates.duration !== undefined) body.duration = updates.duration;
+    if (updates.passingScore !== undefined) body.passingScore = updates.passingScore;
+    if (updates.startDate !== undefined) body.startDate = updates.startDate;
+    if (updates.endDate !== undefined) body.endDate = updates.endDate;
+    if (updates.status) body.status = updates.status.toLowerCase();
+    if (updates.settings !== undefined) body.settings = updates.settings;
     const data = await api.put(`/assessments/${id}`, body);
     return mapAssessment(data);
   },
@@ -140,7 +140,7 @@ export const assessmentService = {
   },
 
   async publish(id: string): Promise<Assessment> {
-    const data = await api.post(`/assessments/${id}/publish`);
+    const data = await api.put(`/assessments/${id}`, { status: 'published' });
     return mapAssessment(data);
   },
 
@@ -150,11 +150,11 @@ export const assessmentService = {
 };
 
 function mapDifficultyToBackend(d?: string): string {
-  if (!d) return 'MEDIUM';
+  if (!d) return 'intermediate';
   const lower = d.toLowerCase();
-  if (lower === 'beginner' || lower === 'easy') return 'EASY';
-  if (lower === 'advanced' || lower === 'hard') return 'HARD';
-  return 'MEDIUM';
+  if (lower === 'easy' || lower === 'beginner') return 'beginner';
+  if (lower === 'hard' || lower === 'advanced') return 'advanced';
+  return 'intermediate';
 }
 
 export default assessmentService;

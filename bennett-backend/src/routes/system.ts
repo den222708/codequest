@@ -73,6 +73,94 @@ system.get("/logs", requireRole("admin"), async (c) => {
   })));
 });
 
+// ── POST /system/backups ───────────────────────────────────────────────
+system.post("/backups", requireRole("admin"), async (c) => {
+  const user = c.get("user") as AuthUser;
+  const body = await c.req.json().catch(() => null);
+  const name = body?.name;
+  const type = body?.type ?? "full";
+  const includes = body?.includes ?? [];
+
+  if (!name || typeof name !== "string") {
+    return sendError(c, 400, "name is required");
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("backups")
+    .insert({
+      name,
+      type,
+      includes,
+      status: "completed",
+      size: 0,
+      created_by: user.id,
+      completed_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) return sendError(c, 500, error.message);
+
+  return sendSuccess(c, {
+    id: data.id,
+    name: data.name,
+    type: data.type,
+    size: data.size,
+    status: data.status,
+    includes: data.includes,
+    createdBy: data.created_by,
+    createdAt: data.created_at,
+    completedAt: data.completed_at,
+  }, 201);
+});
+
+// ── DELETE /system/backups/:id ─────────────────────────────────────────
+system.delete("/backups/:id", requireRole("admin"), async (c) => {
+  const id = c.req.param("id");
+  const supabase = getSupabaseAdmin();
+
+  const { error } = await supabase.from("backups").delete().eq("id", id);
+  if (error) return sendError(c, 500, error.message);
+
+  return sendSuccess(c, { message: "Backup deleted" });
+});
+
+// ── PUT /system/plagiarism/:id/review ─────────────────────────────────
+system.put("/plagiarism/:id/review", requireRole("teacher", "admin"), async (c) => {
+  const user = c.get("user") as AuthUser;
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const status = body?.status;
+
+  if (!status || !["cleared", "confirmed"].includes(status)) {
+    return sendError(c, 400, "status must be 'cleared' or 'confirmed'");
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("plagiarism_results")
+    .update({
+      status,
+      flagged: status === "confirmed",
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) return sendError(c, 500, error.message);
+
+  return sendSuccess(c, {
+    id: data.id,
+    status: data.status,
+    flagged: data.flagged,
+    reviewedBy: data.reviewed_by,
+    reviewedAt: data.reviewed_at,
+  });
+});
+
 // ── GET /system/stats ─────────────────────────────────────────────────
 system.get("/stats", requireRole("admin"), async (c) => {
   const supabase = getSupabaseAdmin();

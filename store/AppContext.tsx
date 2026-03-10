@@ -9,7 +9,7 @@ import { submissionService } from '../services/submissionService';
 import { executeService } from '../services/executeService';
 import { userService, CreateUserResult } from '../services/userService';
 import { classService } from '../services/classService';
-import { ApiError, tokenStore } from '../services/apiClient';
+import { ApiError, tokenStore, api } from '../services/apiClient';
 
 interface AppState {
   // Auth
@@ -66,18 +66,18 @@ interface AppContextType extends AppState {
   loadClasses: () => Promise<void>;
 
   // Question Actions
-  addQuestion: (question: Omit<Question, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => void;
-  updateQuestion: (id: string, updates: Partial<Question>) => void;
-  deleteQuestion: (id: string) => void;
+  addQuestion: (question: Omit<Question, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => Promise<void>;
+  updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
+  deleteQuestion: (id: string) => Promise<void>;
   setEditingQuestion: (question: Question | null) => void;
 
   // Assessment Actions
-  addAssessment: (assessment: Omit<Assessment, 'id' | 'createdAt'>) => void;
-  updateAssessment: (id: string, updates: Partial<Assessment>) => void;
-  deleteAssessment: (id: string) => void;
-  cloneAssessment: (assessmentId: string) => void;
-  startAssessment: (assessmentId: string) => void;
-  submitAssessment: () => void;
+  addAssessment: (assessment: Omit<Assessment, 'id' | 'createdAt'>) => Promise<void>;
+  updateAssessment: (id: string, updates: Partial<Assessment>) => Promise<void>;
+  deleteAssessment: (id: string) => Promise<void>;
+  cloneAssessment: (assessmentId: string) => Promise<void>;
+  startAssessment: (assessmentId: string) => Promise<void>;
+  submitAssessment: () => Promise<void>;
   setEditingAssessment: (assessment: Assessment | null) => void;
 
   // Submission Actions
@@ -89,11 +89,11 @@ interface AppContextType extends AppState {
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void;
 
   // Backup Actions
-  createBackup: (options: { name: string; type: 'full' | 'incremental' | 'differential'; includes: string[] }) => void;
-  deleteBackup: (id: string) => void;
+  createBackup: (options: { name: string; type: 'full' | 'incremental' | 'differential'; includes: string[] }) => Promise<void>;
+  deleteBackup: (id: string) => Promise<void>;
 
   // Plagiarism Actions
-  reviewPlagiarism: (id: string, status: 'cleared' | 'confirmed') => void;
+  reviewPlagiarism: (id: string, status: 'cleared' | 'confirmed') => Promise<void>;
 
   // System Actions
   addSystemLog: (log: Omit<SystemLog, 'id' | 'timestamp'>) => void;
@@ -122,7 +122,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     submissions: [],
     attempts: [],
     systemLogs: [],
-    systemHealth: { cpu: 0, memory: 0, disk: 0, uptime: '0h', activeUsers: 0, requestsPerMinute: 0, avgResponseTime: 0, errorRate: 0, services: [] },
+    systemHealth: {
+      status: 'healthy' as const,
+      uptime: 0,
+      lastChecked: new Date().toISOString(),
+      services: [],
+      metrics: {
+        cpuUsage: 45,
+        memoryUsage: 60,
+        diskUsage: 35,
+        activeConnections: 100,
+        requestsPerMinute: 200,
+        averageResponseTime: 120,
+      },
+      recentErrors: [],
+    },
     backups: [],
     leaderboard: [],
     plagiarismResults: [],
@@ -137,6 +151,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     editingQuestion: null,
   });
   const demoBootstrapPromise = useRef<Promise<void> | null>(null);
+  const isDemoModeRef = useRef(state.isDemoMode);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    isDemoModeRef.current = state.isDemoMode;
+  }, [state.isDemoMode]);
 
   useEffect(() => {
     if (state.darkMode) {
@@ -167,7 +187,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const loadData = async (user?: User | null) => {
     try {
       const current = user || state.currentUser;
-      const isAdmin = current?.role === 'admin' || current?.role === 'superadmin' || current?.role === 'subadmin';
+      const isAdmin = current?.role === 'admin';
       const [questions, assessments, submissions, users, classes] = await Promise.all([
         questionService.getAll().catch(() => []),
         assessmentService.getAll().catch(() => []),
@@ -273,9 +293,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     localStorage.removeItem('codequest_demo_mode');
-    authService.logout();
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
     setState(prev => ({
       ...prev,
       isAuthenticated: false,
@@ -314,7 +338,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       email: user.email,
       role: user.role as string,
       department: user.department,
-      enrollmentId: user.enrollmentId || user.employeeId,
+      enrollmentId: user.role === 'professor' ? (user.employeeId || undefined) : (user.enrollmentId || undefined),
     });
     await loadUsers();
     return result;
@@ -390,10 +414,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const deleteQuestion = async (id: string) => {
     try {
       await questionService.delete(id);
+      setState(prev => ({ ...prev, questions: prev.questions.filter(q => q.id !== id) }));
     } catch (err) {
       console.error('Failed to delete question:', err);
+      addNotification({ type: 'error', title: 'Delete Failed', message: 'Could not delete the question.' });
     }
-    setState(prev => ({ ...prev, questions: prev.questions.filter(q => q.id !== id) }));
   };
 
   // Assessment Actions
@@ -419,7 +444,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const updated = await assessmentService.update(id, updates);
       setState(prev => ({
         ...prev,
-        assessments: prev.assessments.map(a => a.id === id ? { ...updated, questions: a.questions } : a)
+        assessments: prev.assessments.map(a => a.id === id ? updated : a)
       }));
     } catch (err) {
       console.error('Failed to update assessment:', err);
@@ -433,15 +458,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const deleteAssessment = async (id: string) => {
     try {
       await assessmentService.delete(id);
+      setState(prev => ({ ...prev, assessments: prev.assessments.filter(a => a.id !== id) }));
     } catch (err) {
       console.error('Failed to delete assessment:', err);
+      addNotification({ type: 'error', title: 'Delete Failed', message: 'Could not delete the assessment.' });
     }
-    setState(prev => ({ ...prev, assessments: prev.assessments.filter(a => a.id !== id) }));
   };
 
   const startAssessment = async (assessmentId: string) => {
     try {
-      if (state.isDemoMode) {
+      if (isDemoModeRef.current) {
         const demoAssessmentData = state.assessments.find(a => a.id === assessmentId);
         if (!demoAssessmentData || !state.currentUser) return;
 
@@ -503,7 +529,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const submitAssessment = () => {
+  const submitAssessment = async () => {
     if (state.currentAttempt) {
       const relatedSubmissions = state.submissions.filter(
         s => s.assessmentId === state.currentAttempt!.assessmentId && s.studentId === state.currentAttempt!.studentId,
@@ -523,6 +549,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         maxScore,
         status: 'submitted' as const,
       };
+
+      // Persist to backend
+      if (!isDemoModeRef.current && state.currentAttempt) {
+        try {
+          await submissionService.completeAttempt(state.currentAttempt.id, { score, timeSpent: elapsedSeconds });
+        } catch (err) {
+          console.error('Failed to complete attempt on backend:', err);
+        }
+      }
+
       setState(prev => ({
         ...prev,
         attempts: prev.attempts.map(a => a.id === updatedAttempt.id ? updatedAttempt : a),
@@ -538,9 +574,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Submission Actions
+  const VALID_LANGUAGES = ['python', 'javascript', 'java', 'cpp'] as const;
+
   const submitCode = async (questionId: string, code: string, language: string): Promise<Submission> => {
     if (!state.currentUser) {
       throw new Error('You must be logged in to submit code.');
+    }
+    if (!VALID_LANGUAGES.includes(language as typeof VALID_LANGUAGES[number])) {
+      throw new Error(`Unsupported language: ${language}`);
     }
     const question = state.questions.find(q => q.id === questionId);
     if (!question) {
@@ -578,7 +619,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const memoryUsed = run.results.reduce((max, r) => Math.max(max, r.memoryUsed || 0), 0);
 
     let persisted: Submission | null = null;
-    if (!state.isDemoMode) {
+    if (!isDemoModeRef.current) {
       try {
         persisted = await submissionService.create({
           code,
@@ -607,7 +648,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       questionId,
       studentId: state.currentUser.id,
       code,
-      language: language as any,
+      language: language as Submission['language'],
       status,
       score,
       maxScore: question.points || 100,
@@ -669,90 +710,122 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Clone Assessment
-  const cloneAssessment = (assessmentId: string) => {
+  const cloneAssessment = async (assessmentId: string) => {
     const original = state.assessments.find(a => a.id === assessmentId);
-    if (original) {
-      const cloned: Assessment = {
-        ...original,
-        id: `assess-${Date.now()}`,
-        title: `${original.title} (Copy)`,
-        status: 'draft',
-        createdAt: new Date().toISOString(),
-      };
+    if (!original) return;
+
+    try {
+      const cloned = await assessmentService.clone(assessmentId);
       setState(prev => ({ ...prev, assessments: [...prev.assessments, cloned] }));
       addNotification({
         type: 'success',
         title: 'Assessment Cloned',
         message: `"${cloned.title}" has been created.`
       });
+    } catch (err) {
+      console.error('Failed to clone assessment:', err);
+      // Fallback to local clone in demo mode
+      if (isDemoModeRef.current) {
+        const cloned: Assessment = {
+          ...original,
+          id: `assess-${Date.now()}`,
+          title: `${original.title} (Copy)`,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+        };
+        setState(prev => ({ ...prev, assessments: [...prev.assessments, cloned] }));
+        addNotification({
+          type: 'success',
+          title: 'Assessment Cloned',
+          message: `"${cloned.title}" has been created.`
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Clone Failed',
+          message: 'Could not clone the assessment.'
+        });
+      }
     }
   };
 
   // Backup Actions
-  const createBackup = (options: { name: string; type: 'full' | 'incremental' | 'differential'; includes: string[] }) => {
-    const newBackup: Backup = {
-      id: `backup-${Date.now()}`,
-      name: options.name,
-      type: options.type,
-      size: Math.floor(Math.random() * 500000000) + 50000000, // 50-550 MB
-      status: 'in_progress',
-      createdAt: new Date().toISOString(),
-      createdBy: state.currentUser?.id || 'system',
-      includes: options.includes as any,
-    };
-    setState(prev => ({ ...prev, backups: [newBackup, ...prev.backups] }));
-
-    // Simulate backup completion
-    setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        backups: prev.backups.map(b =>
-          b.id === newBackup.id
-            ? { ...b, status: 'completed' as const, completedAt: new Date().toISOString() }
-            : b
-        )
-      }));
+  const createBackup = async (options: { name: string; type: 'full' | 'incremental' | 'differential'; includes: string[] }) => {
+    try {
+      const created = await api.post('/system/backups', options);
+      const newBackup: Backup = {
+        id: created.id,
+        name: created.name,
+        type: created.type,
+        size: created.size ?? 0,
+        status: created.status ?? 'completed',
+        createdAt: created.createdAt,
+        createdBy: created.createdBy,
+        includes: created.includes ?? options.includes,
+        completedAt: created.completedAt,
+      };
+      setState(prev => ({ ...prev, backups: [newBackup, ...prev.backups] }));
       addNotification({
         type: 'success',
         title: 'Backup Completed',
         message: `"${options.name}" has been created successfully.`
       });
-    }, 3000);
+    } catch {
+      addNotification({
+        type: 'error',
+        title: 'Backup Failed',
+        message: `Failed to create backup "${options.name}".`
+      });
+    }
   };
 
-  const deleteBackup = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      backups: prev.backups.filter(b => b.id !== id)
-    }));
+  const deleteBackup = async (id: string) => {
+    try {
+      await api.delete(`/system/backups/${id}`);
+      setState(prev => ({
+        ...prev,
+        backups: prev.backups.filter(b => b.id !== id)
+      }));
+    } catch {
+      addNotification({
+        type: 'error',
+        title: 'Delete Failed',
+        message: 'Failed to delete backup.'
+      });
+    }
   };
 
   // Plagiarism Actions
-  const reviewPlagiarism = (id: string, status: 'cleared' | 'confirmed') => {
-    setState(prev => ({
-      ...prev,
-      plagiarismResults: prev.plagiarismResults.map(p =>
-        p.id === id
-          ? {
-            ...p,
-            status,
-            flagged: status === 'confirmed',
-            reviewedBy: state.currentUser?.id,
-            reviewedAt: new Date().toISOString()
-          }
-          : p
-      )
-    }));
+  const reviewPlagiarism = async (id: string, status: 'cleared' | 'confirmed') => {
+    try {
+      await api.put(`/system/plagiarism/${id}/review`, { status });
+      setState(prev => ({
+        ...prev,
+        plagiarismResults: prev.plagiarismResults.map(p =>
+          p.id === id
+            ? {
+              ...p,
+              status,
+              flagged: status === 'confirmed',
+              reviewedBy: state.currentUser?.id,
+              reviewedAt: new Date().toISOString()
+            }
+            : p
+        )
+      }));
+    } catch {
+      addNotification({
+        type: 'error',
+        title: 'Review Failed',
+        message: 'Failed to persist plagiarism review.'
+      });
+    }
   };
 
   // System Actions
-  const addSystemLog = (log: Omit<SystemLog, 'id' | 'timestamp'>) => {
-    const newLog: SystemLog = {
-      ...log,
-      id: `log-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-    };
-    setState(prev => ({ ...prev, systemLogs: [newLog, ...prev.systemLogs] }));
+  // System logging is handled server-side (activity_logs table) — this is a no-op placeholder
+  const addSystemLog = (_log: Omit<SystemLog, 'id' | 'timestamp'>) => {
+    // No-op: system logs are persisted server-side via activity_logs
   };
 
   const refreshSystemHealth = () => {

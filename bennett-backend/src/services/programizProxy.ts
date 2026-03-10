@@ -54,6 +54,9 @@ export async function executeCode(
     // Non-fatal
   }
 
+  const socketioModule = await import("socket.io-client");
+  const socketio = (socketioModule.default ?? socketioModule) as any;
+
   return new Promise<ExecutionResult>((resolve) => {
     let output = "";
     let resolved = false;
@@ -64,10 +67,6 @@ export async function executeCode(
         resolve(result);
       }
     }
-
-    // Dynamic require to avoid ESM issues with socket.io-client v2
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const socketio = require("socket.io-client");
 
     const sio = socketio(socketUrl, {
       transports: ["websocket"],
@@ -154,7 +153,7 @@ export function executeCodeStream(code: string, languageKey: string): ReadableSt
   }
 
   return new ReadableStream({
-    start(controller) {
+    async start(controller) {
       let closed = false;
 
       function close() {
@@ -168,8 +167,8 @@ export function executeCodeStream(code: string, languageKey: string): ReadableSt
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const socketio = require("socket.io-client");
+      const socketioModule = await import("socket.io-client");
+      const socketio = (socketioModule.default ?? socketioModule) as any;
 
       const sio = socketio(socketUrl, {
         transports: ["websocket"],

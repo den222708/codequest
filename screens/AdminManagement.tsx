@@ -28,7 +28,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
 
     // Only show admin-level users
     const adminUsers = users.filter(u =>
-        u.role === 'admin' || u.role === 'subadmin' || u.role === 'superadmin'
+        u.role === 'admin'
     );
 
     const filteredUsers = adminUsers.filter(user =>

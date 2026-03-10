@@ -810,16 +810,18 @@ const CodeEditor: React.FC<Props> = ({ onSubmit, onExit }) => {
   // Configure Monaco JS/TS live diagnostics (squiggles while typing)
   useEffect(() => {
     if (!monaco) return;
+    // @ts-expect-error -- monaco.languages.typescript is available at runtime
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
       noSemanticValidation: false,
       noSyntaxValidation: false,
       noSuggestionDiagnostics: false,
     });
+    // @ts-expect-error -- monaco.languages.typescript is available at runtime
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-      target: monaco.languages.typescript.ScriptTarget.ES2020,
       lib: ['es2020'],
       allowNonTsExtensions: true,
     });
+    // @ts-expect-error -- monaco.languages.typescript is available at runtime
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
       noSemanticValidation: false,
       noSyntaxValidation: false,

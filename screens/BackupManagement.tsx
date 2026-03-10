@@ -25,8 +25,8 @@ const BackupManagement: React.FC<BackupManagementProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [newBackup, setNewBackup] = useState({
     name: '',
-    type: 'full' as const,
-    includes: ['users', 'assessments', 'questions', 'submissions', 'logs'] as const,
+    type: 'full' as 'full' | 'incremental' | 'differential',
+    includes: ['users', 'assessments', 'questions', 'submissions', 'logs'] as ('users' | 'assessments' | 'questions' | 'submissions' | 'logs')[],
   });
 
   const formatDate = (dateString: string) => {

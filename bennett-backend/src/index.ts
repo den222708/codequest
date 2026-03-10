@@ -23,10 +23,14 @@ const app = new Hono();
 // ── Global middleware ─────────────────────────────────────────────────
 app.use("*", logger());
 
+if (!process.env.CORS_ORIGINS && process.env.NODE_ENV === "production") {
+  console.warn("[CodeQuest] CORS_ORIGINS not set in production — defaulting to localhost only.");
+}
+
 app.use(
   "*",
   cors({
-    origin: (process.env.CORS_ORIGINS ?? "https://bennett.codequest.qzz.io,http://localhost:5173")
+    origin: (process.env.CORS_ORIGINS ?? "http://localhost:5173,http://localhost:3000")
       .split(",")
       .map((s) => s.trim()),
     allowHeaders: ["Content-Type", "Authorization"],

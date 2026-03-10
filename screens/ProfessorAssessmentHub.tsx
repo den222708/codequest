@@ -38,8 +38,8 @@ const ProfessorAssessmentHub: React.FC<Props> = ({
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [selectedAssessmentForMonitor, setSelectedAssessmentForMonitor] = useState<string | null>(null);
 
-    const canCreateAssessments = hasPermission('canCreateAssessments');
-    const canManageQuestions = hasPermission('canManageQuestions');
+    const canCreateAssessments = hasPermission('canCreateAssessment');
+    const canManageQuestions = hasPermission('canManageQuestionBank');
 
     const tabs = [
         { id: 'assessments' as const, label: 'My Assessments', icon: 'assignment', count: assessments.length },
@@ -462,7 +462,7 @@ const ProfessorAssessmentHub: React.FC<Props> = ({
                         <h3 className="text-xl font-bold mb-2">Student Submissions</h3>
                         <p className="text-slate-500">View and grade submissions from your students</p>
                         <button
-                            onClick={() => navigate('/professor/submissions')}
+                            onClick={() => navigate('/professor/assessments')}
                             className="mt-4 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold"
                         >
                             View All Submissions
@@ -539,15 +539,15 @@ const ProfessorAssessmentHub: React.FC<Props> = ({
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
-                                                <div className={`w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold ${result.similarity >= 80 ? 'bg-red-500 text-white' :
-                                                        result.similarity >= 50 ? 'bg-yellow-500 text-white' :
+                                                <div className={`w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold ${result.similarityScore >= 80 ? 'bg-red-500 text-white' :
+                                                        result.similarityScore >= 50 ? 'bg-yellow-500 text-white' :
                                                             'bg-green-500 text-white'
                                                     }`}>
-                                                    {result.similarity}%
+                                                    {result.similarityScore}%
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-bold text-lg">{result.student1Name} ↔ {result.student2Name}</h4>
-                                                    <p className="text-sm text-slate-500">Assessment: {result.assessmentName}</p>
+                                                    <h4 className="font-bold text-lg">{result.studentName} — {result.matchedSubmissions?.length || 0} match(es)</h4>
+                                                    <p className="text-sm text-slate-500">Submission: {result.submissionId?.slice(0, 8)}</p>
                                                     <div className="flex gap-2 mt-2">
                                                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${result.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                                                                 result.status === 'confirmed' ? 'bg-red-100 text-red-700' :

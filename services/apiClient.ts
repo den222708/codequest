@@ -3,11 +3,13 @@
  * Handles all HTTP requests with JWT auth and token refresh
  */
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.PROD
-    ? 'https://bennett-api.codequest.qzz.io/api/v1'
-    : 'http://localhost:3001/api/v1');
+const API_BASE_URL = (() => {
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+  if (import.meta.env.PROD) {
+    throw new Error('[CodeQuest] VITE_API_BASE_URL must be set in production. Build with: VITE_API_BASE_URL=https://your-api.example.com/api/v1');
+  }
+  return 'http://localhost:3001/api/v1';
+})();
 
 // Token storage
 const TOKEN_KEY = 'cq_access_token';

@@ -148,7 +148,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
     total: manageableUsers.length,
     students: manageableUsers.filter(u => u.role === 'student').length,
     professors: manageableUsers.filter(u => u.role === 'professor').length,
-    admins: manageableUsers.filter(u => u.role === 'admin' || u.role === 'subadmin' || u.role === 'superadmin').length,
+    admins: manageableUsers.filter(u => u.role === 'admin').length,
     active: manageableUsers.filter(u => u.status === 'active').length,
   };
 

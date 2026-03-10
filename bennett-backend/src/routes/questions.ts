@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { getSupabaseAdmin } from "../lib/supabase.js";
+import { getSupabaseAdmin, createSupabaseClient } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { cacheGet, cacheSet, cacheFlushPattern } from "../lib/cache.js";
@@ -54,7 +54,10 @@ questions.get("/", async (c) => {
   const cached = cacheGet(cacheKey);
   if (cached) return sendSuccess(c, cached);
 
-  const supabase = getSupabaseAdmin();
+  // Students use per-user client for RLS; teachers/admins use admin client
+  const supabase = user.role === "student"
+    ? createSupabaseClient(c.get("token") as string)
+    : getSupabaseAdmin();
   let query = supabase.from("questions").select("*");
 
   // Students only see visible questions
@@ -88,7 +91,9 @@ questions.get("/:id", async (c) => {
   const cached = cacheGet(cacheKey);
   if (cached) return sendSuccess(c, cached);
 
-  const supabase = getSupabaseAdmin();
+  const supabase = user.role === "student"
+    ? createSupabaseClient(c.get("token") as string)
+    : getSupabaseAdmin();
   const { data, error } = await supabase.from("questions").select("*").eq("id", id).single();
 
   if (error || !data) return sendError(c, 404, "Question not found");

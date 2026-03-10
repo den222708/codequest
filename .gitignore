@@ -12,7 +12,9 @@ dist
 dist-ssr
 *.local
 .env
+**/.env
 backend/.env
+bennett-backend/.env
 backend/prisma/dev.db
 
 # Editor directories and files
@@ -30,4 +32,12 @@ backend/prisma/dev.db
 .claude/
 
 # Nested git repos
-api-test/
+api-test
+
+
+plantofixclaude.md
+plantofixopencode.md
+FIX_PLAN.md
+fixes.md
+MASTER_FIX_PLAN.md
+TSC_REMAINING_FIX_PLAN.md

@@ -1,4 +1,4 @@
-export type Role = 'student' | 'professor' | 'admin' | 'subadmin' | 'superadmin' | null;
+export type Role = 'student' | 'professor' | 'admin' | null;
 
 export type View =
   | 'landing'
@@ -20,6 +20,8 @@ export type View =
   | 'question-bank'
   | 'create-question'
   | 'edit-question'
+  | 'assessments'
+  | 'questions'
   | 'group-setup'
   | 'plagiarism'
   | 'analytics'
@@ -421,22 +423,6 @@ export const ROLE_PERMISSIONS: Record<string, RolePermissions> = {
     canViewSystemLogs: false,
     canViewSystemHealth: false,
   },
-  subadmin: {
-    canAttemptQuiz: false,
-    canCreateAssessment: false,
-    canManageQuestionBank: false,
-    canViewClassAnalytics: true,
-    canViewSystemAnalytics: true,
-    canManageUsers: true, // Limited - can manage students/professors only
-    canManageAdmins: false,
-    canAccessSystemSettings: false, // View-only
-    canViewPlagiarism: true,
-    canManageBackups: false, // View-only
-    canAccessLiveMonitor: false,
-    canViewLeaderboard: true,
-    canViewSystemLogs: true, // View-only
-    canViewSystemHealth: true, // View-only
-  },
   admin: {
     canAttemptQuiz: false,
     canCreateAssessment: false,
@@ -449,22 +435,6 @@ export const ROLE_PERMISSIONS: Record<string, RolePermissions> = {
     canViewPlagiarism: true,
     canManageBackups: true,
     canAccessLiveMonitor: false,
-    canViewLeaderboard: true,
-    canViewSystemLogs: true,
-    canViewSystemHealth: true,
-  },
-  superadmin: {
-    canAttemptQuiz: false,
-    canCreateAssessment: true, // Full access
-    canManageQuestionBank: true, // Full access
-    canViewClassAnalytics: true,
-    canViewSystemAnalytics: true,
-    canManageUsers: true,
-    canManageAdmins: true, // Can manage other admins
-    canAccessSystemSettings: true,
-    canViewPlagiarism: true,
-    canManageBackups: true,
-    canAccessLiveMonitor: true, // Full access
     canViewLeaderboard: true,
     canViewSystemLogs: true,
     canViewSystemHealth: true,
@@ -545,4 +515,3 @@ export interface ClassStudent {
   avatar: string;
   status: string;
 }
-

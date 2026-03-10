@@ -28,7 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole,
         ? '/student/dashboard'
         : currentUser?.role === 'professor'
           ? '/professor/dashboard'
-          : '/admin/dashboard'; // admin, subadmin, superadmin all go to admin dashboard
+          : '/admin/dashboard';
     return <Navigate to={dashboardPath} replace />;
   }
 

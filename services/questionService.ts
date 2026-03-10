@@ -46,7 +46,7 @@ export const questionService = {
     const body = {
       title: question.title,
       description: question.description,
-      difficulty: question.difficulty?.toUpperCase() || 'MEDIUM',
+      difficulty: question.difficulty?.toLowerCase() || 'medium',
       topic: question.topic,
       tags: question.tags,
       points: question.points,
@@ -70,7 +70,7 @@ export const questionService = {
     const body: any = {};
     if (updates.title) body.title = updates.title;
     if (updates.description) body.description = updates.description;
-    if (updates.difficulty) body.difficulty = updates.difficulty.toUpperCase();
+    if (updates.difficulty) body.difficulty = updates.difficulty.toLowerCase();
     if (updates.topic) body.topic = updates.topic;
     if (updates.tags) body.tags = updates.tags;
     if (updates.points !== undefined) body.points = updates.points;

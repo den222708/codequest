@@ -46,28 +46,12 @@ const Layout: React.FC<LayoutProps> = ({
     { icon: 'analytics', label: 'Analytics', path: '/admin/analytics' },
   ];
 
-  const subadminLinks = [
-    { icon: 'school', label: 'Courses', path: '/admin/courses' },
-    { icon: 'group', label: 'User Management', path: '/admin/users' },
-    { icon: 'analytics', label: 'Analytics', path: '/admin/analytics' },
-  ];
-
-  const superadminLinks = [
-    { icon: 'school', label: 'Courses', path: '/admin/courses' },
-    { icon: 'group', label: 'User Management', path: '/admin/users' },
-    { icon: 'admin_panel_settings', label: 'Admin Management', path: '/admin/admins' },
-    { icon: 'analytics', label: 'Analytics', path: '/admin/analytics' },
-    { icon: 'quiz', label: 'Question Bank', path: '/professor/questions' },
-    { icon: 'assignment', label: 'Assessments', path: '/professor/assessments' },
-  ];
-
   const getLinks = () => {
     switch (role) {
       case 'student': return studentLinks;
       case 'professor': return profLinks;
-      case 'subadmin': return subadminLinks;
-      case 'superadmin': return superadminLinks;
-      default: return adminLinks; // admin
+      case 'admin': return adminLinks;
+      default: return adminLinks;
     }
   };
 

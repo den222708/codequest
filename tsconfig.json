@@ -25,5 +25,11 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "api-test",
+    "backend",
+    "bennett-backend/dist",
+    "node_modules"
+  ]
 }

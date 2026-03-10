@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { getSupabaseAdmin } from "../lib/supabase.js";
+import { getSupabaseAdmin, createSupabaseClient } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { runTests } from "../services/testRunner.js";
@@ -26,10 +26,13 @@ submissions.post("/", requireRole("student"), async (c) => {
   if (!parsed.success) return sendError(c, 400, parsed.error.errors[0].message);
 
   const { assessmentId, questionId, attemptId, code, language } = parsed.data;
+  const token = c.get("token") as string;
+  const userDb = createSupabaseClient(token);
   const supabase = getSupabaseAdmin();
 
+  // Use per-user client for student-scoped reads (RLS defense-in-depth)
   // Verify attempt belongs to user and is in-progress
-  const { data: attempt } = await supabase
+  const { data: attempt } = await userDb
     .from("assessment_attempts")
     .select("*")
     .eq("id", attemptId)
@@ -38,6 +41,21 @@ submissions.post("/", requireRole("student"), async (c) => {
     .single();
 
   if (!attempt) return sendError(c, 400, "Invalid or expired attempt");
+
+  // Verify question belongs to this assessment
+  const { data: aqLink } = await supabase
+    .from("assessment_questions")
+    .select("question_id")
+    .eq("assessment_id", assessmentId)
+    .eq("question_id", questionId)
+    .single();
+
+  if (!aqLink) return sendError(c, 400, "Question does not belong to this assessment");
+
+  // Verify attempt is for this assessment
+  if (attempt.assessment_id !== assessmentId) {
+    return sendError(c, 400, "Attempt does not match this assessment");
+  }
 
   // Get question with test cases
   const { data: question } = await supabase
@@ -111,8 +129,11 @@ submissions.get("/", async (c) => {
   const questionId = c.req.query("questionId");
   const studentId = c.req.query("studentId");
 
-  const supabase = getSupabaseAdmin();
-  let query = supabase.from("submissions").select(`
+  // Students use per-user client for RLS; teachers/admins use admin client for cross-user access
+  const db = user.role === "student"
+    ? createSupabaseClient(c.get("token") as string)
+    : getSupabaseAdmin();
+  let query = db.from("submissions").select(`
     *,
     profiles!submissions_student_id_fkey(name),
     questions!submissions_question_id_fkey(title)
@@ -121,6 +142,19 @@ submissions.get("/", async (c) => {
   // Students can only see their own
   if (user.role === "student") {
     query = query.eq("student_id", user.id);
+  } else if (user.role === "teacher") {
+    // Teachers can only see submissions for assessments they created
+    const { data: teacherAssessments } = await db
+      .from("assessments")
+      .select("id")
+      .eq("created_by", user.id);
+    const teacherAssessmentIds = (teacherAssessments ?? []).map(a => a.id);
+    if (teacherAssessmentIds.length > 0) {
+      query = query.in("assessment_id", teacherAssessmentIds);
+    } else {
+      return sendSuccess(c, []);
+    }
+    if (studentId) query = query.eq("student_id", studentId);
   } else if (studentId) {
     query = query.eq("student_id", studentId);
   }
@@ -141,8 +175,10 @@ submissions.get("/:id", async (c) => {
   const user = c.get("user") as AuthUser;
   const id = c.req.param("id");
 
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  const db = user.role === "student"
+    ? createSupabaseClient(c.get("token") as string)
+    : getSupabaseAdmin();
+  const { data, error } = await db
     .from("submissions")
     .select(`
       *,
@@ -167,8 +203,9 @@ submissions.post("/:attemptId/complete", requireRole("student"), async (c) => {
   const user = c.get("user") as AuthUser;
   const attemptId = c.req.param("attemptId");
 
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  // Per-user client for student-scoped writes
+  const userDb = createSupabaseClient(c.get("token") as string);
+  const { data, error } = await userDb
     .from("assessment_attempts")
     .update({
       status: "completed",

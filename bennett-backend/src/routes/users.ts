@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { getSupabaseAdmin } from "../lib/supabase.js";
+import { getSupabaseAdmin, createSupabaseClient } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import type { AuthUser } from "../middleware/auth.js";
@@ -47,7 +47,11 @@ users.get("/", requireRole("teacher", "admin"), async (c) => {
 users.get("/:id", async (c) => {
   const user = c.get("user") as AuthUser;
   const id = c.req.param("id");
-  const supabase = getSupabaseAdmin();
+
+  // Students use per-user client for RLS when viewing own profile
+  const supabase = (user.role === "student" && user.id === id)
+    ? createSupabaseClient(c.get("token") as string)
+    : getSupabaseAdmin();
 
   // Students can only view own profile
   if (user.role === "student" && user.id !== id) {

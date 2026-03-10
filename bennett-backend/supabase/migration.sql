@@ -485,3 +485,92 @@ CREATE TRIGGER attempts_updated_at BEFORE UPDATE ON assessment_attempts
 
 CREATE TRIGGER classes_updated_at BEFORE UPDATE ON classes
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
+-- Token Blacklist (persistent revoked token store)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS token_blacklist (
+  token_hash  TEXT PRIMARY KEY,
+  user_id     UUID REFERENCES profiles(user_id) ON DELETE CASCADE,
+  revoked_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at  TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+
+-- ── Backups ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS backups (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name            TEXT NOT NULL,
+  type            TEXT NOT NULL CHECK (type IN ('full', 'incremental', 'differential')) DEFAULT 'full',
+  size            BIGINT NOT NULL DEFAULT 0,
+  status          TEXT NOT NULL CHECK (status IN ('in_progress', 'completed', 'failed')) DEFAULT 'in_progress',
+  includes        TEXT[] DEFAULT '{}',
+  created_by      UUID REFERENCES profiles(user_id) ON DELETE SET NULL,
+  completed_at    TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ── Plagiarism Results ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS plagiarism_results (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  assessment_id   UUID REFERENCES assessments(id) ON DELETE CASCADE,
+  student_id      UUID REFERENCES profiles(user_id) ON DELETE CASCADE,
+  student_name    TEXT,
+  similarity_score NUMERIC NOT NULL DEFAULT 0,
+  flagged         BOOLEAN NOT NULL DEFAULT false,
+  status          TEXT NOT NULL CHECK (status IN ('pending', 'cleared', 'confirmed')) DEFAULT 'pending',
+  matched_submissions JSONB DEFAULT '[]',
+  reviewed_by     UUID REFERENCES profiles(user_id) ON DELETE SET NULL,
+  reviewed_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_plagiarism_assessment ON plagiarism_results(assessment_id);
+CREATE INDEX IF NOT EXISTS idx_plagiarism_student ON plagiarism_results(student_id);
+
+-- ============================================================
+-- Active Sessions (concurrent session tracking + inactivity timeout)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS active_sessions (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id         UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
+  token_hash      TEXT NOT NULL,
+  ip_address      TEXT,
+  last_active_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_active_sessions_user ON active_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_token ON active_sessions(token_hash);
+
+-- ── Account lockout columns on profiles ─────────────────────
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+
+-- ── Active sessions RLS ─────────────────────────────────────
+ALTER TABLE active_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Users can see only their own sessions; admins see all
+CREATE POLICY active_sessions_select ON active_sessions FOR SELECT
+  TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR public.is_role(ARRAY['admin'])
+  );
+
+-- Server inserts via service-role; authenticated users can insert own
+CREATE POLICY active_sessions_insert ON active_sessions FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- Users can delete own sessions (logout); admins can delete any
+CREATE POLICY active_sessions_delete ON active_sessions FOR DELETE
+  TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR public.is_role(ARRAY['admin'])
+  );
+
+-- Cleanup: remove expired sessions older than 24 hours (run periodically)
+-- DELETE FROM active_sessions WHERE last_active_at < now() - interval '24 hours';

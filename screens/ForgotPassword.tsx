@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../services/authService';
 
 const ForgotPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -11,8 +12,11 @@ const ForgotPassword: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      await authService.forgotPassword(email);
+    } catch {
+      // Silently proceed — backend always returns success for security
+    }
     
     setLoading(false);
     setSent(true);

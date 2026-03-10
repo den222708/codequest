@@ -85,7 +85,15 @@ execute.post(
       return sendError(c, 400, `Unsupported language: ${language}`);
     }
 
-    const results = await runTests(code, language, testCases);
+    const normalizedTestCases = testCases.map((tc) => ({
+      input: tc.input ?? "",
+      expectedOutput: tc.expectedOutput ?? "",
+      isHidden: tc.isHidden ?? false,
+      points: tc.points ?? 0,
+      timeLimit: tc.timeLimit ?? 28000,
+    }));
+
+    const results = await runTests(code, language, normalizedTestCases);
     return sendSuccess(c, results);
   }
 );

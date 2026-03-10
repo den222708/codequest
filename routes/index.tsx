@@ -36,6 +36,12 @@ import Analytics from '../screens/Analytics';
 import UserManagement from '../screens/UserManagement';
 import AdminManagement from '../screens/AdminManagement';
 import CourseManagement from '../screens/CourseManagement';
+import SystemHealth from '../screens/SystemHealth';
+import SystemLogs from '../screens/SystemLogs';
+import BackupManagement from '../screens/BackupManagement';
+import AdminSettings from '../screens/AdminSettings';
+import Notifications from '../screens/Notifications';
+import { demoAssessment } from '../data/demoModeData';
 
 const DemoEntryPage: React.FC = () => {
   const { startDemoMode } = useApp();
@@ -114,7 +120,7 @@ const DemoEntryPage: React.FC = () => {
         if (!mounted) return;
 
         await new Promise((r) => setTimeout(r, 320));
-        navigate('/student/assessments/demo-assessment-1/instructions', { replace: true });
+        navigate(`/student/assessments/${demoAssessment.id}/instructions`, { replace: true });
       } catch (error) {
         console.error('Failed to start demo mode:', error);
         if (!mounted) return;
@@ -180,6 +186,15 @@ const AppRoutes: React.FC = () => {
     submitAssessment,
     setEditingAssessment,
     reviewPlagiarism,
+    systemHealth,
+    systemLogs,
+    backups,
+    notifications,
+    refreshSystemHealth,
+    createBackup,
+    deleteBackup,
+    markNotificationRead,
+    clearNotifications,
   } = useApp();
 
   const navigate = useNavigate();
@@ -365,7 +380,7 @@ const AppRoutes: React.FC = () => {
                       questions={questions}
                       onViewSubmission={(submission) => console.log('View submission:', submission)}
                       onResubmit={(questionId) => {
-                        // Navigate handled by component
+                        navigate(`/student/assessments`);
                       }}
                     />
                   }
@@ -428,7 +443,14 @@ const AppRoutes: React.FC = () => {
               <Routes>
                 <Route
                   path="dashboard"
-                  element={<ProfessorDashboard onNavigate={() => { }} />}
+                  element={<ProfessorDashboard onNavigate={(view) => {
+                    if (view === 'assessments') navigate('/professor/assessments');
+                    else if (view === 'questions') navigate('/professor/questions');
+                    else if (view === 'analytics') navigate('/professor/analytics');
+                    else if (view === 'leaderboard') navigate('/professor/leaderboard');
+                    else if (view === 'live-monitor') navigate('/professor/live-monitor');
+                    else navigate(`/professor/${view}`);
+                  }} />}
                 />
                 <Route
                   path="assessments"
@@ -462,7 +484,7 @@ const AppRoutes: React.FC = () => {
                   path="assessments/create"
                   element={
                     <CreateAssessment
-                      onBack={() => { }}
+                      onBack={() => navigate('/professor/assessments')}
                       onSave={addAssessment}
                       questions={questions}
                       editingAssessment={editingAssessment}
@@ -479,6 +501,7 @@ const AppRoutes: React.FC = () => {
                     <CreateAssessment
                       onBack={() => {
                         setEditingAssessment(null);
+                        navigate('/professor/assessments');
                       }}
                       onSave={addAssessment}
                       questions={questions}
@@ -507,7 +530,7 @@ const AppRoutes: React.FC = () => {
                 />
                 <Route
                   path="questions/create"
-                  element={<CreateQuestion onBack={() => { }} onSave={addQuestion} />}
+                  element={<CreateQuestion onBack={() => navigate('/professor/questions')} onSave={addQuestion} />}
                 />
                 <Route
                   path="questions/:questionId/edit"
@@ -525,7 +548,7 @@ const AppRoutes: React.FC = () => {
                     />
                   }
                 />
-                <Route path="live-monitor" element={<LiveMonitor onBack={() => { }} />} />
+                <Route path="live-monitor" element={<LiveMonitor onBack={() => navigate('/professor/dashboard')} />} />
                 <Route
                   path="analytics"
                   element={<Analytics role="professor" />}
@@ -541,8 +564,8 @@ const AppRoutes: React.FC = () => {
                     />
                   }
                 />
-                <Route path="group-setup" element={<GroupSetup onBack={() => { }} />} />
-                <Route path="plagiarism" element={<PlagiarismReport onBack={() => { }} />} />
+                <Route path="group-setup" element={<GroupSetup onBack={() => navigate('/professor/dashboard')} />} />
+                <Route path="plagiarism" element={<PlagiarismReport onBack={() => navigate('/professor/assessments')} />} />
                 <Route path="*" element={<Navigate to="/professor/dashboard" replace />} />
               </Routes>
             </Layout>
@@ -554,7 +577,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin/*"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'subadmin', 'superadmin']}>
+          <ProtectedRoute allowedRoles={['admin']}>
             <Layout
               role={currentUser?.role || 'admin'}
               onLogout={handleLogout}
@@ -591,6 +614,25 @@ const AppRoutes: React.FC = () => {
                   path="analytics"
                   element={<Analytics role="admin" />}
                 />
+                <Route path="system-health" element={<SystemHealth health={systemHealth} onRefresh={refreshSystemHealth} />} />
+                <Route path="system-logs" element={<SystemLogs logs={systemLogs} users={users} onExport={() => {}} />} />
+                <Route path="backups" element={
+                  <BackupManagement
+                    backups={backups}
+                    onCreateBackup={createBackup}
+                    onRestoreBackup={() => {}}
+                    onDeleteBackup={deleteBackup}
+                    onDownloadBackup={() => {}}
+                  />
+                } />
+                <Route path="settings" element={<AdminSettings />} />
+                <Route path="notifications" element={
+                  <Notifications
+                    notifications={notifications}
+                    onMarkRead={markNotificationRead}
+                    onClearAll={clearNotifications}
+                  />
+                } />
                 <Route path="*" element={<Navigate to="/admin/courses" replace />} />
               </Routes>
             </Layout>

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { getSupabaseAdmin } from "../lib/supabase.js";
+import { getSupabaseAdmin, createSupabaseClient } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { cacheGet, cacheSet, cacheFlushPattern } from "../lib/cache.js";
@@ -50,10 +50,11 @@ assessments.get("/", async (c) => {
 
   const supabase = getSupabaseAdmin();
 
-  // Students only see assessments assigned to their enrolled classes (+ demo)
+  // Students use per-user client for RLS-scoped enrollment/assignment reads
   if (user.role === "student") {
+    const userDb = createSupabaseClient(c.get("token") as string);
     // Get class IDs the student is enrolled in
-    const { data: enrollments, error: enrollErr } = await supabase
+    const { data: enrollments, error: enrollErr } = await userDb
       .from("class_enrollments")
       .select("class_id")
       .eq("student_id", user.id);
@@ -64,7 +65,7 @@ assessments.get("/", async (c) => {
     // Get assessment IDs assigned to those classes
     let assignedIds: string[] = [];
     if (classIds.length > 0) {
-      const { data: assignments, error: assignErr } = await supabase
+      const { data: assignments, error: assignErr } = await userDb
         .from("assessment_assignments")
         .select("assessment_id")
         .in("class_id", classIds);
@@ -149,6 +150,33 @@ assessments.get("/:id", async (c) => {
   if (error || !data) return sendError(c, 404, "Assessment not found");
   if (user.role === "student" && data.status === "draft") {
     return sendError(c, 404, "Assessment not found");
+  }
+
+  // Students can only view assessments assigned to their class or demo assessments
+  if (user.role === "student") {
+    const isDemo = data.course_code === "DEMO-101";
+    if (!isDemo) {
+      const userDb = createSupabaseClient(c.get("token") as string);
+      const { data: enrollments } = await userDb
+        .from("class_enrollments")
+        .select("class_id")
+        .eq("student_id", user.id);
+      const classIds = (enrollments ?? []).map((e) => e.class_id);
+      let hasAccess = false;
+      if (classIds.length > 0) {
+        const { data: assignment } = await userDb
+          .from("assessment_assignments")
+          .select("id")
+          .eq("assessment_id", id)
+          .in("class_id", classIds)
+          .limit(1)
+          .maybeSingle();
+        hasAccess = !!assignment;
+      }
+      if (!hasAccess) {
+        return sendError(c, 403, "This assessment is not assigned to your class");
+      }
+    }
   }
 
   const mapped = mapAssessment(data);
@@ -349,6 +377,8 @@ assessments.post("/:id/clone", requireRole("teacher", "admin"), async (c) => {
 assessments.post("/:id/attempts", requireRole("student"), async (c) => {
   const user = c.get("user") as AuthUser;
   const assessmentId = c.req.param("id");
+  const token = c.get("token") as string;
+  const userDb = createSupabaseClient(token);
   const supabase = getSupabaseAdmin();
 
   // Check assessment exists and is active
@@ -364,9 +394,10 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
   }
 
   // Verify student has access: enrolled in a class with this assessment, or demo
+  // Per-user client for RLS-scoped enrollment reads
   const isDemo = assessment.course_code === "DEMO-101";
   if (!isDemo) {
-    const { data: enrollments, error: enrollErr } = await supabase
+    const { data: enrollments, error: enrollErr } = await userDb
       .from("class_enrollments")
       .select("class_id")
       .eq("student_id", user.id);
@@ -377,7 +408,7 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
       return sendError(c, 403, "You are not enrolled in any class");
     }
 
-    const { data: assignment, error: assignErr } = await supabase
+    const { data: assignment, error: assignErr } = await userDb
       .from("assessment_assignments")
       .select("id")
       .eq("assessment_id", assessmentId)
@@ -391,8 +422,8 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
     }
   }
 
-  // Check max attempts
-  const { count, error: countErr } = await supabase
+  // Check max attempts (per-user client)
+  const { count, error: countErr } = await userDb
     .from("assessment_attempts")
     .select("*", { count: "exact", head: true })
     .eq("assessment_id", assessmentId)
@@ -404,7 +435,7 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
     return sendError(c, 400, "Maximum attempts reached");
   }
 
-  const { data: attempt, error } = await supabase
+  const { data: attempt, error } = await userDb
     .from("assessment_attempts")
     .insert({
       assessment_id: assessmentId,

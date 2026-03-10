@@ -3,9 +3,9 @@ import { executeCode } from "./programizProxy.js";
 interface TestCase {
   input: string;
   expectedOutput: string;
-  isHidden: boolean;
-  points: number;
-  timeLimit: number;
+  isHidden?: boolean;
+  points?: number;
+  timeLimit?: number;
 }
 
 interface TestResult {
@@ -92,10 +92,14 @@ export async function runTests(
 
   for (let i = 0; i < testCases.length; i++) {
     const tc = testCases[i];
-    totalPoints += tc.points;
+    const points = tc.points ?? 0;
+    const isHidden = tc.isHidden ?? false;
+    const timeLimit = tc.timeLimit ?? 28000;
+
+    totalPoints += points;
 
     const injectedCode = injectStdin(code, language, tc.input);
-    const result = await executeCode(injectedCode, language, tc.timeLimit || 28000);
+    const result = await executeCode(injectedCode, language, timeLimit);
 
     const actualOutput = cleanOutput(result.output);
     const expectedTrimmed = tc.expectedOutput.trim();
@@ -103,18 +107,18 @@ export async function runTests(
 
     if (testPassed) {
       passed++;
-      earnedPoints += tc.points;
+      earnedPoints += points;
     }
 
     results.push({
       index: i,
       passed: testPassed,
-      input: tc.isHidden ? "[hidden]" : tc.input,
-      expectedOutput: tc.isHidden ? "[hidden]" : tc.expectedOutput,
-      actualOutput: tc.isHidden ? (testPassed ? "[correct]" : "[incorrect]") : actualOutput,
-      isHidden: tc.isHidden,
-      points: tc.points,
-      error: tc.isHidden ? (result.error ? "Execution error" : undefined) : result.error,
+      input: isHidden ? "[hidden]" : tc.input,
+      expectedOutput: isHidden ? "[hidden]" : tc.expectedOutput,
+      actualOutput: isHidden ? (testPassed ? "[correct]" : "[incorrect]") : actualOutput,
+      isHidden,
+      points,
+      error: isHidden ? (result.error ? "Execution error" : undefined) : result.error,
     });
   }
 

@@ -4,7 +4,7 @@ import type { Submission } from '../types';
 export const submissionService = {
   async getAll(filters?: { userId?: string; questionId?: string }): Promise<Submission[]> {
     const params = new URLSearchParams();
-    if (filters?.userId) params.set('userId', filters.userId);
+    if (filters?.userId) params.set('studentId', filters.userId);
     if (filters?.questionId) params.set('questionId', filters.questionId);
     const query = params.toString();
     const data = await api.get<any[]>(`/submissions${query ? `?${query}` : ''}`);
@@ -36,25 +36,47 @@ export const submissionService = {
     const data = await api.post('/submissions', submission);
     return mapSubmission(data);
   },
+
+  async completeAttempt(attemptId: string, payload?: { score?: number; timeSpent?: number }): Promise<any> {
+    return api.post(`/submissions/${attemptId}/complete`, payload || {});
+  },
 };
 
 function mapSubmission(s: any): Submission {
   return {
     id: s.id,
-    assessmentId: s.attemptId || '',
-    questionId: s.questionId,
-    studentId: s.userId || s.studentId || '',
+    assessmentId: s.assessmentId || s.assessment_id || '',
+    questionId: s.questionId || s.question_id || '',
+    studentId: s.studentId || s.student_id || s.userId || '',
     code: s.code,
     language: s.language,
-    status: s.status || 'pending',
+    status: mapSubmissionStatus(s.status),
     score: s.score || 0,
-    maxScore: s.maxScore || 100,
-    testResults: s.results?.testResults || s.testResults || [],
+    maxScore: s.maxScore || s.max_score || 100,
+    testResults: s.test_results || s.results?.testResults || s.testResults || [],
     executionTime: s.executionTime || 0,
     memoryUsed: s.memoryUsed || 0,
-    submittedAt: s.submittedAt || s.createdAt || new Date().toISOString(),
+    submittedAt: s.submittedAt || s.created_at || s.createdAt || new Date().toISOString(),
     plagiarismScore: s.plagiarismScore,
   };
+}
+
+/** Map backend status values to frontend enum */
+function mapSubmissionStatus(status?: string): Submission['status'] {
+  if (!status) return 'pending';
+  const map: Record<string, Submission['status']> = {
+    pending: 'pending',
+    running: 'running',
+    passed: 'passed',
+    failed: 'failed',
+    error: 'error',
+    accepted: 'passed',
+    rejected: 'failed',
+    partial: 'partial',
+    completed: 'passed',
+    'timed-out': 'error',
+  };
+  return map[status] || 'pending';
 }
 
 export default submissionService;

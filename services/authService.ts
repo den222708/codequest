@@ -47,14 +47,19 @@ export const authService = {
     const user = tokenStore.getUser();
     return user;
   },
+
+  async forgotPassword(email: string): Promise<void> {
+    await api.post('/auth/forgot-password', { email });
+  },
 };
 
 function mapUser(raw: any): User {
+  const rawRole = raw.role?.toLowerCase();
   return {
     id: raw.id,
     name: raw.name,
     email: raw.email,
-    role: raw.role?.toLowerCase() as Role,
+    role: (rawRole === 'teacher' ? 'professor' : rawRole) as Role,
     avatar: raw.avatar || raw.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase(),
     department: raw.department,
     enrollmentId: raw.enrollmentId,

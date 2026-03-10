@@ -50,19 +50,12 @@ export interface TestRunSummary {
   };
 }
 
-const getDemoExecuteHeaders = (): HeadersInit | undefined => {
-  if (typeof window === 'undefined') return undefined;
-  const isDemoMode = localStorage.getItem('codequest_demo_mode') === 'true';
-  return isDemoMode ? { 'X-CodeQuest-Demo': 'true' } : undefined;
-};
-
 export const executeService = {
   async runCode(code: string, language: string, stdin?: string): Promise<ExecuteResult> {
     try {
       return await api.post<ExecuteResult>(
         '/execute',
         { code, language, stdin },
-        { headers: getDemoExecuteHeaders() },
       );
     } catch (error: any) {
       if (error?.message) {
@@ -85,11 +78,26 @@ export const executeService = {
     }
 
     try {
-      return await api.post<TestRunSummary>(
+      const raw = await api.post<any>(
         '/execute/run-tests',
         { code, language, testCases },
-        { headers: getDemoExecuteHeaders() },
       );
+      // Backend returns {totalTests, passed, failed, results} — adapt to frontend shape
+      if (raw.summary) return raw as TestRunSummary;
+      return {
+        results: raw.results || [],
+        summary: {
+          passed: raw.passed ?? 0,
+          total: raw.totalTests ?? testCases.length,
+          score: raw.totalTests ? Math.round((raw.passed / raw.totalTests) * 100) : 0,
+          averageTime: raw.results?.length
+            ? raw.results.reduce((s: number, r: any) => s + (r.executionTime || 0), 0) / raw.results.length
+            : 0,
+          maxMemory: raw.results?.length
+            ? Math.max(...raw.results.map((r: any) => r.memoryUsed || 0))
+            : 0,
+        },
+      } as TestRunSummary;
     } catch (error: any) {
       if (error?.message) {
         throw new Error(error.message);
@@ -100,10 +108,15 @@ export const executeService = {
 
   async getLanguages(): Promise<{ id: string; name: string; extension: string }[]> {
     try {
-      return await api.get<{ id: string; name: string; extension: string }[]>(
+      const data = await api.get<any[]>(
         '/execute/languages',
-        { headers: getDemoExecuteHeaders() },
       );
+      // Backend returns {key, label, extension} — map to frontend shape
+      return data.map((item: any) => ({
+        id: item.key || item.id,
+        name: item.label || item.name,
+        extension: item.extension,
+      }));
     } catch {
       return Object.entries(JUDGE0_LANGUAGES).map(([key, val]) => ({
         id: key,
