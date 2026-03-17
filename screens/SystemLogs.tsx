@@ -14,8 +14,7 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
   onExport,
   onClearLogs,
 }) => {
-  const [levelFilter, setLevelFilter] = useState<'all' | 'info' | 'warning' | 'error' | 'debug'>('all');
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'auth' | 'submission' | 'assessment' | 'user' | 'system' | 'security'>('all');
+  const [actionFilter, setActionFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: '',
@@ -27,45 +26,47 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
 
   const getUser = (userId?: string) => users.find(u => u.id === userId);
 
+  // Derive unique action types for filter dropdown
+  const actionTypes = useMemo(() => {
+    const types = new Set(logs.map(log => log.action));
+    return Array.from(types).sort();
+  }, [logs]);
+
   const filteredLogs = useMemo(() => {
     let result = [...logs];
 
-    // Apply level filter
-    if (levelFilter !== 'all') {
-      result = result.filter(log => log.level === levelFilter);
-    }
-
-    // Apply category filter
-    if (categoryFilter !== 'all') {
-      result = result.filter(log => log.category === categoryFilter);
+    // Apply action filter
+    if (actionFilter !== 'all') {
+      result = result.filter(log => log.action === actionFilter);
     }
 
     // Apply search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(log =>
-        log.message.toLowerCase().includes(query) ||
+        log.action.toLowerCase().includes(query) ||
         log.userName?.toLowerCase().includes(query) ||
-        log.ipAddress.includes(query)
+        log.userEmail?.toLowerCase().includes(query) ||
+        log.ipAddress?.includes(query)
       );
     }
 
     // Apply date range
     if (dateRange.start) {
       const startDate = new Date(dateRange.start);
-      result = result.filter(log => new Date(log.timestamp) >= startDate);
+      result = result.filter(log => new Date(log.createdAt) >= startDate);
     }
     if (dateRange.end) {
       const endDate = new Date(dateRange.end);
       endDate.setHours(23, 59, 59, 999);
-      result = result.filter(log => new Date(log.timestamp) <= endDate);
+      result = result.filter(log => new Date(log.createdAt) <= endDate);
     }
 
-    // Sort by timestamp descending
-    result.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    // Sort by createdAt descending
+    result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return result;
-  }, [logs, levelFilter, categoryFilter, searchQuery, dateRange]);
+  }, [logs, actionFilter, searchQuery, dateRange]);
 
   const paginatedLogs = useMemo(() => {
     const start = (currentPage - 1) * logsPerPage;
@@ -74,26 +75,19 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
 
   const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'info': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'warning': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'error': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'debug': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'auth': return '🔐';
-      case 'submission': return '📝';
-      case 'assessment': return '📋';
-      case 'user': return '👤';
-      case 'system': return '⚙️';
-      case 'security': return '🛡️';
-      default: return '📌';
-    }
+  const getActionColor = (action: string) => {
+    const a = action.toLowerCase();
+    if (a.includes('login') || a.includes('logout') || a.includes('auth'))
+      return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    if (a.includes('error') || a.includes('fail'))
+      return 'bg-red-500/20 text-red-400 border-red-500/30';
+    if (a.includes('create') || a.includes('submit'))
+      return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    if (a.includes('update') || a.includes('change'))
+      return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    if (a.includes('delete') || a.includes('remove'))
+      return 'bg-red-500/20 text-red-400 border-red-500/30';
+    return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   };
 
   const formatDate = (dateString: string) => {
@@ -111,14 +105,14 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
   const stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayLogs = logs.filter(log => new Date(log.timestamp) >= today);
-    
+    const todayLogs = logs.filter(log => new Date(log.createdAt) >= today);
+
     return {
       total: logs.length,
       today: todayLogs.length,
-      errors: logs.filter(log => log.level === 'error').length,
-      warnings: logs.filter(log => log.level === 'warning').length,
-      securityEvents: logs.filter(log => log.category === 'security').length,
+      authEvents: logs.filter(log => log.action.toLowerCase().includes('login') || log.action.toLowerCase().includes('auth')).length,
+      uniqueUsers: new Set(logs.filter(l => l.userId).map(l => l.userId)).size,
+      uniqueIPs: new Set(logs.filter(l => l.ipAddress).map(l => l.ipAddress)).size,
     };
   }, [logs]);
 
@@ -155,7 +149,7 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex items-center justify-center text-teal-400">
@@ -180,34 +174,23 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
         </div>
         <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center text-red-400">
-              ❌
+            <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-400">
+              👤
             </div>
             <div>
-              <div className="text-gray-400 text-sm">Errors</div>
-              <div className="text-xl font-bold text-red-400">{stats.errors.toLocaleString()}</div>
+              <div className="text-gray-400 text-sm">Unique Users</div>
+              <div className="text-xl font-bold text-purple-400">{stats.uniqueUsers.toLocaleString()}</div>
             </div>
           </div>
         </div>
         <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-400">
-              ⚠️
+              🔐
             </div>
             <div>
-              <div className="text-gray-400 text-sm">Warnings</div>
-              <div className="text-xl font-bold text-amber-400">{stats.warnings.toLocaleString()}</div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-400">
-              🛡️
-            </div>
-            <div>
-              <div className="text-gray-400 text-sm">Security Events</div>
-              <div className="text-xl font-bold text-purple-400">{stats.securityEvents.toLocaleString()}</div>
+              <div className="text-gray-400 text-sm">Auth Events</div>
+              <div className="text-xl font-bold text-amber-400">{stats.authEvents.toLocaleString()}</div>
             </div>
           </div>
         </div>
@@ -230,32 +213,16 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
             </div>
           </div>
 
-          {/* Level Filter */}
+          {/* Action Filter */}
           <select
-            value={levelFilter}
-            onChange={(e) => setLevelFilter(e.target.value as any)}
+            value={actionFilter}
+            onChange={(e) => setActionFilter(e.target.value)}
             className="bg-[#0d0d0d] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-teal-500"
           >
-            <option value="all">All Levels</option>
-            <option value="info">Info</option>
-            <option value="warning">Warning</option>
-            <option value="error">Error</option>
-            <option value="debug">Debug</option>
-          </select>
-
-          {/* Category Filter */}
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as any)}
-            className="bg-[#0d0d0d] border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-teal-500"
-          >
-            <option value="all">All Categories</option>
-            <option value="auth">Authentication</option>
-            <option value="submission">Submissions</option>
-            <option value="assessment">Assessments</option>
-            <option value="user">User Management</option>
-            <option value="system">System</option>
-            <option value="security">Security</option>
+            <option value="all">All Actions</option>
+            {actionTypes.map(action => (
+              <option key={action} value={action}>{action}</option>
+            ))}
           </select>
 
           {/* Date Range */}
@@ -282,10 +249,9 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
         {/* Table Header */}
         <div className="grid grid-cols-12 gap-4 p-4 bg-[#0d0d0d] text-gray-400 text-sm font-medium border-b border-gray-800">
           <div className="col-span-2">Timestamp</div>
-          <div className="col-span-1">Level</div>
-          <div className="col-span-1">Category</div>
-          <div className="col-span-4">Message</div>
-          <div className="col-span-2">User</div>
+          <div className="col-span-2">Action</div>
+          <div className="col-span-3">User</div>
+          <div className="col-span-3">Email</div>
           <div className="col-span-2">IP Address</div>
         </div>
 
@@ -305,23 +271,18 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
                 onClick={() => setSelectedLog(log)}
               >
                 <div className="col-span-2 text-gray-400 text-sm">
-                  {formatDate(log.timestamp)}
+                  {formatDate(log.createdAt)}
                 </div>
-                <div className="col-span-1">
-                  <span className={`px-2 py-1 rounded text-xs font-medium border ${getLevelColor(log.level)}`}>
-                    {log.level.toUpperCase()}
+                <div className="col-span-2">
+                  <span className={`px-2 py-1 rounded text-xs font-medium border ${getActionColor(log.action)}`}>
+                    {log.action}
                   </span>
                 </div>
-                <div className="col-span-1">
-                  <span className="text-lg" title={log.category}>
-                    {getCategoryIcon(log.category)}
-                  </span>
-                </div>
-                <div className="col-span-4 text-white truncate">
-                  {log.message}
-                </div>
-                <div className="col-span-2 text-gray-400 text-sm truncate">
+                <div className="col-span-3 text-white truncate">
                   {log.userName || '-'}
+                </div>
+                <div className="col-span-3 text-gray-400 text-sm truncate">
+                  {log.userEmail || '-'}
                 </div>
                 <div className="col-span-2 text-gray-500 text-sm font-mono">
                   {log.ipAddress}
@@ -381,11 +342,9 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-800">
               <div className="flex items-center gap-3">
-                <span className={`px-2 py-1 rounded text-xs font-medium border ${getLevelColor(selectedLog.level)}`}>
-                  {selectedLog.level.toUpperCase()}
+                <span className={`px-2 py-1 rounded text-xs font-medium border ${getActionColor(selectedLog.action)}`}>
+                  {selectedLog.action}
                 </span>
-                <span className="text-xl">{getCategoryIcon(selectedLog.category)}</span>
-                <span className="text-white font-medium capitalize">{selectedLog.category}</span>
               </div>
               <button
                 onClick={() => setSelectedLog(null)}
@@ -398,14 +357,14 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
             {/* Modal Content */}
             <div className="p-4 space-y-4">
               <div>
-                <label className="text-gray-400 text-sm">Message</label>
-                <p className="text-white mt-1">{selectedLog.message}</p>
+                <label className="text-gray-400 text-sm">Action</label>
+                <p className="text-white mt-1">{selectedLog.action}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-gray-400 text-sm">Timestamp</label>
-                  <p className="text-white mt-1">{formatDate(selectedLog.timestamp)}</p>
+                  <p className="text-white mt-1">{formatDate(selectedLog.createdAt)}</p>
                 </div>
                 <div>
                   <label className="text-gray-400 text-sm">IP Address</label>
@@ -416,28 +375,21 @@ const SystemLogs: React.FC<SystemLogsProps> = ({
               {selectedLog.userId && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-gray-400 text-sm">User ID</label>
-                    <p className="text-white font-mono mt-1">{selectedLog.userId}</p>
-                  </div>
-                  <div>
-                    <label className="text-gray-400 text-sm">User Name</label>
+                    <label className="text-gray-400 text-sm">User</label>
                     <p className="text-white mt-1">{selectedLog.userName || '-'}</p>
                   </div>
+                  <div>
+                    <label className="text-gray-400 text-sm">Email</label>
+                    <p className="text-white mt-1">{selectedLog.userEmail || '-'}</p>
+                  </div>
                 </div>
               )}
 
-              {selectedLog.userAgent && (
+              {selectedLog.details && Object.keys(selectedLog.details).length > 0 && (
                 <div>
-                  <label className="text-gray-400 text-sm">User Agent</label>
-                  <p className="text-gray-300 text-sm mt-1 break-all">{selectedLog.userAgent}</p>
-                </div>
-              )}
-
-              {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
-                <div>
-                  <label className="text-gray-400 text-sm">Metadata</label>
+                  <label className="text-gray-400 text-sm">Details</label>
                   <pre className="bg-[#0d0d0d] rounded-lg p-3 mt-1 text-sm text-gray-300 overflow-x-auto">
-                    {JSON.stringify(selectedLog.metadata, null, 2)}
+                    {JSON.stringify(selectedLog.details, null, 2)}
                   </pre>
                 </div>
               )}

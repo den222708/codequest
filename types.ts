@@ -132,7 +132,7 @@ export interface Submission {
   studentId: string;
   code: string;
   language: 'python' | 'javascript' | 'java' | 'cpp';
-  status: 'pending' | 'running' | 'passed' | 'failed' | 'partial' | 'error';
+  status: 'pending' | 'accepted' | 'passed' | 'partial' | 'rejected' | 'failed' | 'error' | 'wrong_answer';
   score: number;
   maxScore: number;
   testResults: TestResult[];
@@ -259,37 +259,25 @@ export interface PlagiarismScanSummary {
 // System Logs Types
 export interface SystemLog {
   id: string;
-  level: 'info' | 'warning' | 'error' | 'debug';
-  category: 'auth' | 'submission' | 'assessment' | 'user' | 'system' | 'security';
-  message: string;
-  userId?: string;
-  userName?: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  action: string;
+  details: Record<string, any> | null;
   ipAddress: string;
-  userAgent?: string;
-  metadata?: Record<string, any>;
-  timestamp: string;
+  createdAt: string;
 }
 
 // System Health Types
 export interface SystemHealth {
   status: 'healthy' | 'degraded' | 'unhealthy';
   uptime: number;
-  lastChecked: string;
-  services: {
-    name: string;
-    status: 'up' | 'down' | 'degraded';
-    responseTime: number;
-    lastChecked: string;
-  }[];
-  metrics: {
-    cpuUsage: number;
-    memoryUsage: number;
-    diskUsage: number;
-    activeConnections: number;
-    requestsPerMinute: number;
-    averageResponseTime: number;
-  };
-  recentErrors: SystemLog[];
+  timestamp: string;
+  database: { connected: boolean; responseTime?: number };
+  codeExecution: { provider: string; status: string; circuitBreaker?: any };
+  memory: { heapUsed: number; heapTotal: number; rss: number };
+  cache: { keys: number; hits: number; misses: number };
+  nodeVersion: string;
 }
 
 // Backup Types

@@ -116,16 +116,25 @@ Go to **Project Settings → API** and copy:
 | `SUPABASE_ANON_KEY` | `anon` / `public` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | `service_role` key (keep secret!) |
 
-### 2.3 Run database migrations
+### 2.3 Run database bootstrap SQL
 
 1. Go to **SQL Editor** in the Supabase dashboard
-2. Open and paste the contents of `supabase/migration.sql`
-3. Click **Run** — this creates all tables, indexes, RLS policies, and triggers
-4. Then paste and run `supabase/seed.sql` — this inserts demo questions and the demo practice assessment
+2. Open and run `supabase/master.sql` (single canonical schema + seed script)
+3. Do **not** run legacy `migration.sql` + `seed.sql` for fresh setup
+4. If you previously ran an older script and hit errors mid-way, reset/clean the database and rerun the latest `master.sql` from the start
+
+Common SQL Editor issues (older script variants):
+
+- `ERROR: 42501 ... RI_ConstraintTrigger... is a system trigger`
+  - Cause: trigger disable statements are blocked in hosted Supabase
+  - Fix: use latest `master.sql` (no trigger-disabling statements)
+- `ERROR: 22P02 invalid input syntax for type uuid: "t000..."`
+  - Cause: non-hex placeholder UUIDs in old seed IDs
+  - Fix: use latest `master.sql` (hex-only placeholder UUIDs)
 
 ### 2.4 Verify tables
 
-In **Table Editor**, confirm these 10 tables exist:
+In **Table Editor**, confirm these 17 tables exist:
 - `profiles`
 - `questions`
 - `assessments`
@@ -136,6 +145,16 @@ In **Table Editor**, confirm these 10 tables exist:
 - `classes`
 - `class_enrollments`
 - `assessment_assignments`
+- `token_blacklist`
+- `active_sessions`
+- `notifications`
+- `password_history`
+- `backups`
+- `plagiarism_results`
+- `monitoring_events`
+
+RLS check:
+- In latest `master.sql`, `token_blacklist` also has RLS enabled (with no user-facing policies; service-role backend access still works).
 
 ---
 

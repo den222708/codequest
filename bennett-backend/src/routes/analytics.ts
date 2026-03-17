@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
-import { cacheGet, cacheSet, cacheStats } from "../lib/cache.js";
+import { cacheGet, cacheSet } from "../lib/cache.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
 

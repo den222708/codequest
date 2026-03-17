@@ -71,7 +71,7 @@ export async function authMiddleware(c: Context, next: Next) {
         user_id: data.user.id,
         revoked_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-      });
+      }, { onConflict: 'token_hash' });
       return c.json({ success: false, error: "Session expired due to inactivity" }, 401);
     }
 

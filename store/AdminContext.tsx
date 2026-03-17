@@ -26,24 +26,19 @@ export interface AdminContextType {
   scanPlagiarism: (assessmentId: string, sensitivity?: 'low' | 'medium' | 'high') => Promise<void>;
   loadPlagiarismResults: (assessmentId: string) => Promise<void>;
   reviewPlagiarism: (id: string, status: 'cleared' | 'confirmed') => Promise<void>;
-  addSystemLog: (log: Omit<SystemLog, 'id' | 'timestamp'>) => void;
+  addSystemLog: (log: Omit<SystemLog, 'id' | 'createdAt'>) => void;
   refreshSystemHealth: () => void;
 }
 
 const defaultHealth: SystemHealth = {
   status: 'healthy' as const,
   uptime: 0,
-  lastChecked: new Date().toISOString(),
-  services: [],
-  metrics: {
-    cpuUsage: 45,
-    memoryUsage: 60,
-    diskUsage: 35,
-    activeConnections: 100,
-    requestsPerMinute: 200,
-    averageResponseTime: 120,
-  },
-  recentErrors: [],
+  timestamp: new Date().toISOString(),
+  database: { connected: false },
+  codeExecution: { provider: 'programiz', status: 'unknown' },
+  memory: { heapUsed: 0, heapTotal: 0, rss: 0 },
+  cache: { keys: 0, hits: 0, misses: 0 },
+  nodeVersion: '',
 };
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -208,28 +203,28 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, []);
 
-  const addSystemLog = useCallback((_log: Omit<SystemLog, 'id' | 'timestamp'>) => {
+  const addSystemLog = useCallback((_log: Omit<SystemLog, 'id' | 'createdAt'>) => {
     // No-op: system logs are persisted server-side via activity_logs
   }, []);
 
   const refreshSystemHealth = useCallback(async () => {
     try {
       const data = await api.get('/system/health');
-      setSystemHealth(prev => ({
-        ...prev,
-        status: data.status === 'healthy' ? 'healthy' as const : 'degraded' as const,
-        uptime: data.uptime ?? prev.uptime,
-        lastChecked: data.timestamp ?? new Date().toISOString(),
-        metrics: {
-          ...prev.metrics,
-          memoryUsage: data.memory?.heapUsed ?? prev.metrics.memoryUsage,
-        },
-      }));
+      setSystemHealth({
+        status: data.status ?? 'healthy',
+        uptime: data.uptime ?? 0,
+        timestamp: data.timestamp ?? new Date().toISOString(),
+        database: data.database ?? { connected: false },
+        codeExecution: data.codeExecution ?? { provider: 'programiz', status: 'unknown' },
+        memory: data.memory ?? { heapUsed: 0, heapTotal: 0, rss: 0 },
+        cache: data.cache ?? { keys: 0, hits: 0, misses: 0 },
+        nodeVersion: data.nodeVersion ?? '',
+      });
     } catch {
       setSystemHealth(prev => ({
         ...prev,
         status: 'degraded' as const,
-        lastChecked: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
       }));
     }
   }, []);

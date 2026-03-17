@@ -22,8 +22,8 @@ npm install
 cp .env.example .env
 # Fill in your Supabase credentials
 
-# Run Supabase migration
-# Go to Supabase Dashboard → SQL Editor → paste supabase/migration.sql → Run
+# Run Supabase bootstrap SQL
+# Go to Supabase Dashboard -> SQL Editor -> paste supabase/master.sql -> Run
 
 # Start dev server
 npm run dev
@@ -149,8 +149,14 @@ cloudflared tunnel --url http://localhost:3001
 
 ## Database
 
-Run `supabase/migration.sql` in the Supabase SQL Editor to create:
-- 7 tables (profiles, questions, assessments, assessment_questions, assessment_attempts, submissions, activity_logs)
-- Indexes on all foreign keys and frequently queried columns
-- Row Level Security policies for all tables
-- Auto-updating `updated_at` triggers
+Run `supabase/master.sql` in Supabase SQL Editor. It creates:
+- 17 tables (full production schema)
+- Indexes on FK and high-frequency query columns
+- RLS policies and helper functions
+- Trigger-based `updated_at` maintenance
+- Seed data (admin, teacher, 113 students, 12 questions, class/enrollment/assignment)
+
+Common SQL Editor issues:
+- `ERROR 42501` about `RI_ConstraintTrigger...` -> use latest `master.sql` (no trigger-disabling statements)
+- `ERROR 22P02` invalid UUID like `t000...` -> use latest `master.sql` (hex-only placeholder UUIDs)
+- `token_blacklist` shows RLS disabled -> run `ALTER TABLE public.token_blacklist ENABLE ROW LEVEL SECURITY;`

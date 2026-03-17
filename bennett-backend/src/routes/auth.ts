@@ -98,6 +98,20 @@ async function resetFailedLogins(supabase: ReturnType<typeof getSupabaseAdmin>, 
 
 // ── Helper: manage concurrent sessions ────────────────────────────────
 async function enforceSessionLimit(supabase: ReturnType<typeof getSupabaseAdmin>, userId: string, newTokenHash: string, ip: string): Promise<void> {
+  // Delete excess sessions FIRST to avoid TOCTOU race
+  const { data: sessions } = await supabase
+    .from("active_sessions")
+    .select("id, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  if (sessions && sessions.length >= MAX_CONCURRENT_SESSIONS) {
+    // Remove oldest sessions until count is MAX - 1 (making room for the new one)
+    const toRemove = sessions.slice(0, sessions.length - MAX_CONCURRENT_SESSIONS + 1);
+    const idsToRemove = toRemove.map((s) => s.id);
+    await supabase.from("active_sessions").delete().in("id", idsToRemove);
+  }
+
   // Insert new session
   await supabase.from("active_sessions").insert({
     user_id: userId,
@@ -105,20 +119,6 @@ async function enforceSessionLimit(supabase: ReturnType<typeof getSupabaseAdmin>
     ip_address: ip,
     last_active_at: new Date().toISOString(),
   });
-
-  // Check count
-  const { data: sessions } = await supabase
-    .from("active_sessions")
-    .select("id, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
-
-  if (sessions && sessions.length > MAX_CONCURRENT_SESSIONS) {
-    // Remove oldest sessions to stay within limit
-    const toRemove = sessions.slice(0, sessions.length - MAX_CONCURRENT_SESSIONS);
-    const idsToRemove = toRemove.map((s) => s.id);
-    await supabase.from("active_sessions").delete().in("id", idsToRemove);
-  }
 }
 
 // ── POST /auth/login ──────────────────────────────────────────────────
@@ -285,7 +285,7 @@ auth.post("/logout", async (c) => {
       user_id: userData.user.id,
       revoked_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-    }).then(({ error }) => {
+    }, { onConflict: 'token_hash' }).then(({ error }) => {
       if (error) log.error({ err: error }, "token_blacklist upsert failed");
     });
 
@@ -318,9 +318,28 @@ auth.post("/refresh", async (c) => {
   }
 
   const supabase = getSupabaseAdmin();
+
+  // Compute old token hash from current Authorization header (if present)
+  const authHeader = c.req.header("Authorization");
+  const oldToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const oldTokenHash = oldToken ? hashToken(oldToken) : null;
+
   const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
   if (error || !data.session) {
     return sendError(c, 401, "Invalid or expired refresh token");
+  }
+
+  // Update active_sessions: replace old token hash with new one
+  if (oldTokenHash && data.user) {
+    const newTokenHash = hashToken(data.session.access_token);
+    await supabase
+      .from("active_sessions")
+      .update({ token_hash: newTokenHash, last_active_at: new Date().toISOString() })
+      .eq("user_id", data.user.id)
+      .eq("token_hash", oldTokenHash)
+      .then(({ error: updateErr }) => {
+        if (updateErr) log.error({ err: updateErr }, "active_sessions token_hash update on refresh failed");
+      });
   }
 
   return sendSuccess(c, {

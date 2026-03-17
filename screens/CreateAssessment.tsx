@@ -110,9 +110,10 @@ const CreateAssessment: React.FC<Props> = ({ onBack, onSave, questions, editingA
     
     if (isEditing && editingAssessment && onUpdate) {
       onUpdate(editingAssessment.id, assessmentData);
+      onBack();
     } else {
       onSave(assessmentData);
-    onBack();
+      onBack();
     }
   };
 

@@ -6,7 +6,7 @@ import { cacheStats } from "../lib/cache.js";
 import { getExecutionStats, getActiveBackend, setActiveBackend, type ExecutionBackend } from "../services/executionDispatcher.js";
 import { createNotification } from "../services/notificationService.js";
 import { detectPlagiarism, type SubmissionInput } from "../services/plagiarismDetector.js";
-import { getAllSessions, getSession as getMonitoringSession } from "../services/socketServer.js";
+import { getAllSessions } from "../services/socketServer.js";
 import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
@@ -422,6 +422,7 @@ system.get("/stats", requireRole("admin"), async (c) => {
     supabase
       .from("submissions")
       .select("student_id, score, profiles!submissions_student_id_fkey(name, department)")
+      .in("status", ["accepted", "partial"])
       .order("score", { ascending: false })
       .limit(200),
     supabase

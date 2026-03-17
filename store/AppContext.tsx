@@ -98,7 +98,7 @@ export interface AppContextType {
   scanPlagiarism: (assessmentId: string, sensitivity?: 'low' | 'medium' | 'high') => Promise<void>;
   loadPlagiarismResults: (assessmentId: string) => Promise<void>;
   reviewPlagiarism: (id: string, status: 'cleared' | 'confirmed') => Promise<void>;
-  addSystemLog: (log: Omit<SystemLog, 'id' | 'timestamp'>) => void;
+  addSystemLog: (log: Omit<SystemLog, 'id' | 'createdAt'>) => void;
   refreshSystemHealth: () => void;
 
   // UI

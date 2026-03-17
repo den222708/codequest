@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { SystemHealth as SystemHealthType, SystemLog } from '../types';
+import { SystemHealth as SystemHealthType } from '../types';
 
 interface SystemHealthProps {
   health: SystemHealthType;
   onRefresh: () => void;
-  onServiceRestart?: (serviceName: string) => void;
 }
 
 const SystemHealth: React.FC<SystemHealthProps> = ({
   health,
   onRefresh,
-  onServiceRestart,
 }) => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(30);
@@ -27,11 +25,13 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
     switch (status) {
       case 'healthy':
       case 'up':
+      case 'connected':
         return 'bg-emerald-500';
       case 'degraded':
         return 'bg-amber-500';
       case 'unhealthy':
       case 'down':
+      case 'disconnected':
         return 'bg-red-500';
       default:
         return 'bg-gray-500';
@@ -57,7 +57,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (days > 0) return `${days}d ${hours}h ${minutes}m`;
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
@@ -72,6 +72,16 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
       second: '2-digit',
     }).format(new Date(dateString));
   };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const memoryUsagePercent = health.memory
+    ? Math.round((health.memory.heapUsed / health.memory.heapTotal) * 100)
+    : 0;
 
   const getMetricStatus = (value: number, thresholds: { warning: number; critical: number }) => {
     if (value >= thresholds.critical) return 'critical';
@@ -89,7 +99,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
     const status = getMetricStatus(value, { warning, critical });
     const color = status === 'critical' ? 'text-red-400' : status === 'warning' ? 'text-amber-400' : 'text-emerald-400';
     const bgColor = status === 'critical' ? 'bg-red-500' : status === 'warning' ? 'bg-amber-500' : 'bg-emerald-500';
-    
+
     return (
       <div className="bg-[#0d0d0d] rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
@@ -132,7 +142,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
             </label>
             <span className="text-gray-400 text-sm">Auto-refresh</span>
           </div>
-          
+
           {autoRefresh && (
             <select
               value={refreshInterval}
@@ -150,7 +160,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
             onClick={onRefresh}
             className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors flex items-center gap-2"
           >
-            🔄 Refresh
+            Refresh
           </button>
         </div>
       </div>
@@ -163,7 +173,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
             <div>
               <h2 className="text-xl font-bold capitalize">System {health.status}</h2>
               <p className="text-sm opacity-75">
-                Uptime: {formatUptime(health.uptime)} • Last checked: {formatDate(health.lastChecked)}
+                Uptime: {formatUptime(health.uptime)} | Last checked: {formatDate(health.timestamp)} | Node {health.nodeVersion}
               </p>
             </div>
           </div>
@@ -175,132 +185,103 @@ const SystemHealth: React.FC<SystemHealthProps> = ({
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Memory Usage */}
         <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
           <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-            <span>💻</span> Resource Usage
+            Memory Usage
           </h3>
           <div className="space-y-4">
             <MetricGauge
-              value={health.metrics.cpuUsage}
-              label="CPU Usage"
-              unit="%"
-              warning={70}
-              critical={90}
-            />
-            <MetricGauge
-              value={health.metrics.memoryUsage}
-              label="Memory Usage"
+              value={memoryUsagePercent}
+              label="Heap Usage"
               unit="%"
               warning={80}
               critical={95}
             />
-            <MetricGauge
-              value={health.metrics.diskUsage}
-              label="Disk Usage"
-              unit="%"
-              warning={75}
-              critical={90}
-            />
-          </div>
-        </div>
-
-        <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
-          <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-            <span>📊</span> Performance Metrics
-          </h3>
-          <div className="space-y-4">
-            <div className="bg-[#0d0d0d] rounded-lg p-4">
+            <div className="bg-[#0d0d0d] rounded-lg p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm">Active Connections</span>
-                <span className="text-white font-bold text-lg">{health.metrics.activeConnections}</span>
+                <span className="text-gray-400 text-sm">Heap Used</span>
+                <span className="text-white font-medium">{formatBytes(health.memory?.heapUsed ?? 0)}</span>
               </div>
-            </div>
-            <div className="bg-[#0d0d0d] rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm">Requests/min</span>
-                <span className="text-white font-bold text-lg">{health.metrics.requestsPerMinute}</span>
+                <span className="text-gray-400 text-sm">Heap Total</span>
+                <span className="text-white font-medium">{formatBytes(health.memory?.heapTotal ?? 0)}</span>
               </div>
-            </div>
-            <div className="bg-[#0d0d0d] rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm">Avg Response Time</span>
-                <span className={`font-bold text-lg ${
-                  health.metrics.averageResponseTime < 200 ? 'text-emerald-400' :
-                  health.metrics.averageResponseTime < 500 ? 'text-amber-400' : 'text-red-400'
-                }`}>
-                  {health.metrics.averageResponseTime}ms
-                </span>
+                <span className="text-gray-400 text-sm">RSS</span>
+                <span className="text-white font-medium">{formatBytes(health.memory?.rss ?? 0)}</span>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Services Status */}
         <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
           <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-            <span>🔧</span> Services Status
+            Services Status
           </h3>
           <div className="space-y-3">
-            {health.services.map((service) => (
-              <div
-                key={service.name}
-                className="bg-[#0d0d0d] rounded-lg p-3 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${getStatusColor(service.status)}`} />
-                  <span className="text-white">{service.name}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-sm">{service.responseTime}ms</span>
-                  {onServiceRestart && service.status !== 'up' && (
-                    <button
-                      onClick={() => onServiceRestart(service.name)}
-                      className="px-2 py-1 text-xs bg-teal-500/20 text-teal-400 rounded hover:bg-teal-500/30 transition-colors"
-                    >
-                      Restart
-                    </button>
-                  )}
+            {/* Database */}
+            <div className="bg-[#0d0d0d] rounded-lg p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${getStatusColor(health.database?.connected ? 'healthy' : 'down')}`} />
+                <span className="text-white">Database</span>
+              </div>
+              <span className="text-gray-400 text-sm">
+                {health.database?.connected ? 'Connected' : 'Disconnected'}
+                {health.database?.responseTime != null && ` (${health.database.responseTime}ms)`}
+              </span>
+            </div>
+            {/* Code Execution */}
+            <div className="bg-[#0d0d0d] rounded-lg p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${getStatusColor(health.codeExecution?.status || 'unknown')}`} />
+                <span className="text-white">Code Execution</span>
+              </div>
+              <span className="text-gray-400 text-sm">
+                {health.codeExecution?.provider ?? 'N/A'} ({health.codeExecution?.status ?? 'unknown'})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Cache Stats */}
+        <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
+          <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+            Cache
+          </h3>
+          <div className="space-y-3">
+            <div className="bg-[#0d0d0d] rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Keys</span>
+                <span className="text-white font-bold text-lg">{health.cache?.keys ?? 0}</span>
+              </div>
+            </div>
+            <div className="bg-[#0d0d0d] rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Hits</span>
+                <span className="text-emerald-400 font-bold text-lg">{health.cache?.hits ?? 0}</span>
+              </div>
+            </div>
+            <div className="bg-[#0d0d0d] rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Misses</span>
+                <span className="text-amber-400 font-bold text-lg">{health.cache?.misses ?? 0}</span>
+              </div>
+            </div>
+            {health.cache && (health.cache.hits + health.cache.misses) > 0 && (
+              <div className="bg-[#0d0d0d] rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 text-sm">Hit Rate</span>
+                  <span className="text-white font-bold text-lg">
+                    {((health.cache.hits / (health.cache.hits + health.cache.misses)) * 100).toFixed(1)}%
+                  </span>
                 </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
-
-      {/* Recent Errors */}
-      <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-4">
-        <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-          <span>⚠️</span> Recent Errors
-          {health.recentErrors.length > 0 && (
-            <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded-full">
-              {health.recentErrors.length}
-            </span>
-          )}
-        </h3>
-        
-        {health.recentErrors.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-4xl mb-2">✓</div>
-            <p className="text-gray-400">No recent errors. System running smoothly!</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {health.recentErrors.slice(0, 5).map((error) => (
-              <div
-                key={error.id}
-                className="bg-[#0d0d0d] rounded-lg p-3 border-l-4 border-red-500"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-red-400 font-medium">{error.category}</span>
-                  <span className="text-gray-500 text-sm">{formatDate(error.timestamp)}</span>
-                </div>
-                <p className="text-gray-300 text-sm">{error.message}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-
     </div>
   );
 };

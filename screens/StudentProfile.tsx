@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
+import { api } from '../services/apiClient';
 import { useNavigate } from 'react-router-dom';
 
 const StudentProfile: React.FC = () => {
-  const { currentUser, submissions, assessments, updateUser } = useApp();
+  const { currentUser, submissions, assessments } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'achievements' | 'activity' | 'settings'>('overview');
   const [isEditing, setIsEditing] = useState(false);
@@ -569,9 +570,9 @@ const StudentProfile: React.FC = () => {
                     />
                   </div>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (currentUser) {
-                        updateUser(currentUser.id, formData);
+                        await api.put(`/users/${currentUser.id}`, formData);
                         setSaveSuccess(true);
                         setTimeout(() => setSaveSuccess(false), 3000);
                       }

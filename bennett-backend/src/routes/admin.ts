@@ -120,7 +120,7 @@ admin.post("/users/bulk", async (c) => {
   const supabase = getSupabaseAdmin();
   const adminUser = c.get("user") as AuthUser;
 
-  const created: Array<{ email: string; name: string; role: string; userId: string; password: string }> = [];
+  const created: Array<{ email: string; name: string; role: string; userId: string; generatedPassword: string }> = [];
   const failed: Array<{ email: string; reason: string }> = [];
 
   for (const u of parsed.data.users) {
@@ -172,7 +172,7 @@ admin.post("/users/bulk", async (c) => {
       name: u.name,
       role: u.role,
       userId: data.user.id,
-      password,
+      generatedPassword: password,
     });
 
     // Welcome notification (fire-and-forget)

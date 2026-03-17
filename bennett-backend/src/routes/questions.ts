@@ -99,8 +99,7 @@ questions.get("/", async (c) => {
   if (search) {
     const safe = search.replace(/[%_(),.*\\]/g, "");
     if (safe) {
-      const escaped = safe.replace(/%/g, "\\%").replace(/_/g, "\\_");
-      query = query.or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+      query = query.or(`title.ilike.%${safe}%,description.ilike.%${safe}%`);
     }
   }
 

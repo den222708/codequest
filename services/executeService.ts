@@ -1,5 +1,6 @@
 import { JUDGE0_LANGUAGES } from './judge0Service';
 import api from './apiClient';
+import { tokenStore } from './apiClient';
 
 export interface ExecuteResult {
   stdout: string;
@@ -50,13 +51,71 @@ export interface TestRunSummary {
   };
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
+
 export const executeService = {
   async runCode(code: string, language: string, stdin?: string): Promise<ExecuteResult> {
     try {
-      return await api.post<ExecuteResult>(
-        '/execute',
-        { code, language, stdin },
-      );
+      const token = tokenStore.getAccessToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API_BASE_URL}/execute`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ code, language, stdin }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || errBody?.message || `Execution failed with status ${res.status}`);
+      }
+
+      // Parse SSE stream
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No response stream');
+
+      const decoder = new TextDecoder();
+      let stdout = '';
+      let stderr = '';
+      let exitCode: number | null = null;
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        // Keep the last (possibly incomplete) line in the buffer
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'stdout') stdout += event.data;
+            else if (event.type === 'stderr') stderr += event.data;
+            else if (event.type === 'exit') exitCode = event.code ?? null;
+          } catch {
+            // skip malformed JSON
+          }
+        }
+      }
+
+      return {
+        stdout,
+        stderr,
+        compileOutput: '',
+        message: '',
+        status: { id: exitCode === 0 ? 3 : 11, description: exitCode === 0 ? 'Accepted' : 'Runtime Error' },
+        token: '',
+        exitCode,
+        executionTime: 0,
+        memoryUsed: 0,
+      };
     } catch (error: any) {
       if (error?.message) {
         throw new Error(error.message);

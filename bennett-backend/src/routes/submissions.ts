@@ -44,6 +44,17 @@ submissions.post("/", requireRole("student"), async (c) => {
 
   if (!attempt) return sendError(c, 400, "Invalid or expired attempt");
 
+  // Check assessment end_date — reject submissions after the assessment has ended
+  const { data: assessmentCheck } = await supabase
+    .from("assessments")
+    .select("end_date")
+    .eq("id", assessmentId)
+    .single();
+
+  if (assessmentCheck?.end_date && new Date(assessmentCheck.end_date) < new Date()) {
+    return sendError(c, 403, "Assessment has ended");
+  }
+
   // Verify question belongs to this assessment
   const { data: aqLink } = await supabase
     .from("assessment_questions")
@@ -196,10 +207,10 @@ submissions.get("/", async (c) => {
   const questionId = c.req.query("questionId");
   const studentId = c.req.query("studentId");
 
-  // Students use per-user client for RLS; teachers/admins use admin client for cross-user access
-  const db = user.role === "student"
-    ? createSupabaseClient(c.get("token") as string)
-    : getSupabaseAdmin();
+  // Students and teachers use per-user client for RLS; admins use admin client for cross-user access
+  const db = user.role === "admin"
+    ? getSupabaseAdmin()
+    : createSupabaseClient(c.get("token") as string);
   let query = db.from("submissions").select(`
     *,
     profiles!submissions_student_id_fkey(name),
@@ -242,9 +253,9 @@ submissions.get("/:id", async (c) => {
   const user = c.get("user") as AuthUser;
   const id = c.req.param("id");
 
-  const db = user.role === "student"
-    ? createSupabaseClient(c.get("token") as string)
-    : getSupabaseAdmin();
+  const db = user.role === "admin"
+    ? getSupabaseAdmin()
+    : createSupabaseClient(c.get("token") as string);
   const { data, error } = await db
     .from("submissions")
     .select(`
@@ -272,12 +283,28 @@ submissions.post("/:attemptId/complete", requireRole("student"), async (c) => {
 
   // Per-user client for student-scoped writes
   const userDb = createSupabaseClient(c.get("token") as string);
+
+  // Fetch the attempt first to compute time_spent
+  const { data: existingAttempt } = await userDb
+    .from("assessment_attempts")
+    .select("started_at")
+    .eq("id", attemptId)
+    .eq("student_id", user.id)
+    .eq("status", "in-progress")
+    .single();
+
+  if (!existingAttempt) return sendError(c, 400, "Attempt not found or already completed");
+
+  const completedAt = new Date().toISOString();
+  const timeSpent = Math.floor((Date.now() - new Date(existingAttempt.started_at).getTime()) / 1000);
+
   const { data, error } = await userDb
     .from("assessment_attempts")
     .update({
       status: "completed",
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      completed_at: completedAt,
+      updated_at: completedAt,
+      time_spent: timeSpent,
     })
     .eq("id", attemptId)
     .eq("student_id", user.id)

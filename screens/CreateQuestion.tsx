@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Question, TestCase, QuestionType, MCQOption } from '../types';
+import { Question, TestCase, QuestionType, MCQOption } from '../types';
 
 interface Props {
   onBack: () => void;

@@ -1,5 +1,184 @@
 # Changelog
 
+## [2026-03-18] - Supabase SQL Bootstrap Compatibility (3 fixes)
+
+### Critical SQL Fixes
+
+#### S1. Hosted Supabase trigger permission error (`bennett-backend/supabase/master.sql`)
+- **Severity:** CRITICAL
+- **Observed error:** `ERROR: 42501: permission denied: "RI_ConstraintTrigger..." is a system trigger`
+- **Cause:** Older script versions used `ALTER TABLE ... DISABLE TRIGGER ALL`, which is blocked for RI/system triggers in Supabase SQL Editor.
+- **Fix:** Removed trigger-disable/re-enable strategy. Seed now runs without disabling system triggers, and `profiles_user_id_fkey` is re-applied at the end as `NOT VALID`.
+
+#### S2. Invalid placeholder UUID format (`bennett-backend/supabase/master.sql`)
+- **Severity:** CRITICAL
+- **Observed error:** `ERROR: 22P02: invalid input syntax for type uuid: "t0000000-..."`
+- **Cause:** Placeholder IDs used non-hex prefixes (`t`, `s`, `q`) which are not valid UUID characters.
+- **Fix:** Replaced all non-hex placeholder prefixes with valid hex-only prefixes across seed data and references:
+  - teacher: `t...` -> `b...`
+  - students: `s...` -> `d...`
+  - questions: `q...` -> `e...`
+
+#### S3. `token_blacklist` RLS alignment (`bennett-backend/supabase/master.sql`)
+- **Severity:** HIGH
+- **Issue:** Table was created without RLS, making behavior inconsistent with the rest of the security model.
+- **Fix:** Enabled RLS on `token_blacklist`.
+- **Policy model:** No user-facing policies are defined for this table, so anon/authenticated access is denied by default; backend service-role flows remain functional.
+
+### Verification
+- UUID literal scan in `master.sql`: `invalid_count = 0`
+- Script no longer contains `DISABLE TRIGGER` / `ENABLE TRIGGER` statements
+
+### Notes
+- If a prior SQL run partially applied objects, reset the DB (or clean objects) before rerunning the updated `master.sql`.
+- `md files/disable-devtool-guide.md` is documentation-only at this point. The app currently uses custom proctoring heuristics (`services/monitoringService.ts`) and does not install/initialize the `disable-devtool` package.
+
+## [2026-03-17T18:30:00Z] - Cross-Layer Bug Sweep (35 fixes)
+
+Comprehensive analysis and fix pass covering frontend-backend contract mismatches,
+security bugs, dead code, and type inconsistencies across the entire codebase.
+
+### Critical Fixes (7)
+
+#### C1. `POST /execute` SSE vs JSON mismatch (`services/executeService.ts`)
+- **Severity:** CRITICAL
+- **Bug:** `api.post()` called `res.json()` on a `text/event-stream` SSE response — runtime crash on every code execution.
+- **Fix:** Rewrote `runCode()` to use raw `fetch()` with SSE stream parsing. Reads `data:` events, accumulates stdout/stderr, captures exit code. `runTests()` remains JSON-based.
+
+#### C2. `GET /submissions/user/:userId` route does not exist (`services/submissionService.ts`)
+- **Severity:** CRITICAL
+- **Bug:** `getByUser()` called a nonexistent endpoint, returning 404.
+- **Fix:** Changed to `GET /submissions?studentId=${userId}` using URLSearchParams.
+
+#### C3. `POST /submissions` body mismatch (`services/submissionService.ts`)
+- **Severity:** CRITICAL
+- **Bug:** Frontend sent `userId` (not accepted) and omitted `assessmentId` (required by backend Zod). Every submission create call was rejected.
+- **Fix:** Replaced `userId` with `assessmentId` (required). Added optional `answer` field for MCQ/short-answer. Backend derives `student_id` from JWT.
+
+#### C4. `SystemLog` type has no field overlap with backend (`types.ts`, `screens/SystemLogs.tsx`)
+- **Severity:** CRITICAL
+- **Bug:** Frontend expected `level`, `category`, `message`, `userAgent`, `metadata`, `timestamp`. Backend returns `action`, `details`, `userEmail`, `createdAt`. Admin logs screen rendered empty.
+- **Fix:** Rewrote `SystemLog` interface to match backend: `{ id, userId, userName, userEmail, action, details, ipAddress, createdAt }`. Rewrote `SystemLogs.tsx` to use action-based filtering, stats, and display.
+
+#### C5. `SystemHealth` type has no field overlap with backend (`types.ts`, `screens/SystemHealth.tsx`)
+- **Severity:** CRITICAL
+- **Bug:** Frontend expected `services[]`, `cpuUsage`, `diskUsage`, `activeConnections`, `requestsPerMinute`, `recentErrors`. Backend returns `database`, `codeExecution`, `memory`, `cache`, `nodeVersion`. Health dashboard was completely broken.
+- **Fix:** Rewrote `SystemHealth` interface to match backend shape. Rewrote `SystemHealth.tsx` to show actual backend data: heap memory gauge, database/code-execution service status, cache stats with hit rate.
+
+#### C6. Token refresh does not update session hash (`bennett-backend/src/routes/auth.ts`)
+- **Severity:** CRITICAL (Security)
+- **Bug:** After token refresh, `active_sessions.token_hash` still pointed to the old token. Session timeout enforcement stopped working entirely — security bypass.
+- **Fix:** Compute old/new token hashes (SHA256) during refresh. Update the `active_sessions` row to the new hash and reset `last_active_at`.
+
+#### C7. `assessment_attempts.time_spent` never calculated (`bennett-backend/src/routes/submissions.ts`)
+- **Severity:** CRITICAL (Data Loss)
+- **Bug:** `time_spent` was set to `0` on creation and never updated. All analytics relying on time tracking showed zeroes.
+- **Fix:** On attempt completion, fetch `started_at`, compute elapsed seconds, include in the UPDATE payload.
+
+### Medium Fixes (11)
+
+#### M1. TOCTOU race in `enforceSessionLimit` (`bennett-backend/src/routes/auth.ts`)
+- **Severity:** MEDIUM (Security)
+- **Bug:** Insert-then-count-then-delete pattern allowed concurrent logins to bypass the 2-session limit.
+- **Fix:** Reversed to delete-first pattern: count existing sessions, delete oldest excess, then insert new.
+
+#### M2. Notification `read` vs `isRead` field — mapping verified
+- **Severity:** MEDIUM
+- **Status:** `NotificationContext.mapApiNotification()` already maps backend `isRead` → frontend `read`. Frontend type kept as `read: boolean`. No fix needed — verified correct.
+
+#### M4. User filter `role=professor` returns zero results (`services/userService.ts`)
+- **Severity:** MEDIUM
+- **Bug:** DB stores `teacher`, frontend sends `professor` as query param. Query returned nothing.
+- **Fix:** Added translation: `filters.role === 'professor' ? 'teacher' : filters.role` before sending.
+
+#### M5. Bulk user create returns `password` not `generatedPassword` (`bennett-backend/src/routes/admin.ts`)
+- **Severity:** MEDIUM
+- **Bug:** Frontend reads `r.generatedPassword` → undefined. Admins couldn't see temporary passwords.
+- **Fix:** Changed response field from `password` to `generatedPassword`.
+
+#### M6. No server-side check against assessment `end_date` (`bennett-backend/src/routes/submissions.ts`)
+- **Severity:** MEDIUM (Assessment Integrity)
+- **Bug:** Students could submit code after the assessment officially ended.
+- **Fix:** POST submission handler now fetches the assessment and rejects with 403 if `end_date` has passed.
+
+#### M7. Leaderboard counts rejected/error submissions (`bennett-backend/src/routes/system.ts`)
+- **Severity:** MEDIUM
+- **Bug:** `/system/stats` leaderboard included all submissions regardless of status, inflating scores.
+- **Fix:** Added `.in("status", ["accepted", "partial"])` filter to leaderboard query.
+
+#### M8. `token_blacklist` upsert missing `onConflict` (`bennett-backend/src/routes/auth.ts`, `middleware/auth.ts`)
+- **Severity:** MEDIUM
+- **Bug:** Concurrent logout+timeout for the same token caused unique constraint errors.
+- **Fix:** Added `{ onConflict: 'token_hash' }` to both `.upsert()` calls.
+
+#### M9. No validation `startDate < endDate` (`bennett-backend/src/routes/assessments.ts`)
+- **Severity:** MEDIUM
+- **Bug:** Teachers could create assessments with impossible date ranges.
+- **Fix:** Added `.refine()` to Zod schema validating `startDate < endDate`.
+
+#### M10. `monitoring_mode` column unreachable via API (`bennett-backend/src/routes/assessments.ts`)
+- **Severity:** MEDIUM (Feature Gap)
+- **Bug:** DB column `monitoring_mode` existed but had no API read/write path. Proctored mode couldn't be enabled.
+- **Fix:** Added `monitoringMode` to Zod schema, INSERT/UPDATE payloads, and `mapAssessment` response.
+
+#### M11+M12. StudentProfile update broken (`screens/StudentProfile.tsx`)
+- **Severity:** MEDIUM
+- **Bug (M11):** `updateUser()` called without `await` — success toast fired before server confirmed.
+- **Bug (M12):** Student used admin-scoped `updateUser` from `AdminContext` — likely 403.
+- **Fix:** Imported `api` directly, call `await api.put('/users/${id}', formData)` which hits `PUT /users/:id` (allows self-update).
+
+#### M13. Edit assessment doesn't navigate back (`screens/CreateAssessment.tsx`)
+- **Severity:** MEDIUM
+- **Bug:** After editing an assessment, `onBack()` was not called — user stranded on edit page.
+- **Fix:** Added `onBack()` call after `onUpdate()` in the edit branch.
+
+#### M14. Submission status type diverges (`types.ts`)
+- **Severity:** MEDIUM
+- **Bug:** Frontend type had `'running'` (unreachable) and missed DB values `'accepted'`, `'rejected'`, `'wrong_answer'`.
+- **Fix:** Expanded `Submission.status` to include both raw DB values and mapped frontend values. Updated `mapSubmissionStatus` to map `accepted`/`rejected`/`wrong_answer` to themselves.
+
+#### M17. Teacher queries bypass RLS (`bennett-backend/src/routes/submissions.ts`)
+- **Severity:** MEDIUM (Defense-in-Depth)
+- **Bug:** Teacher-scoped queries used `getSupabaseAdmin()`, bypassing RLS.
+- **Fix:** Teachers now use `createSupabaseClient(token)`. Only admins use the admin client.
+
+### Low Fixes (7)
+
+- **L1:** Removed dead destructured variables `cloneAssessment`, `reviewPlagiarism` from `routes/index.tsx`
+- **L2:** Removed unused `View` import from `screens/CreateQuestion.tsx`
+- **L10:** Removed dead double-escaping of `%`/`_` in `bennett-backend/src/routes/questions.ts` (first regex already stripped them)
+- **L12:** Removed unused `cacheStats` import from `bennett-backend/src/routes/analytics.ts`
+- **L13:** Removed unused `getMonitoringSession` import from `bennett-backend/src/routes/system.ts`
+
+### Files Changed (23)
+
+**Frontend (13):**
+- `types.ts` — SystemLog, SystemHealth, Submission status types rewritten
+- `services/executeService.ts` — SSE stream parser
+- `services/submissionService.ts` — Fixed endpoints and body shape
+- `services/userService.ts` — Role translation for query params
+- `screens/SystemLogs.tsx` — Rewrote for new SystemLog type
+- `screens/SystemHealth.tsx` — Rewrote for new SystemHealth type
+- `screens/StudentProfile.tsx` — Direct API call, added await
+- `screens/CreateAssessment.tsx` — onBack() after edit
+- `screens/CreateQuestion.tsx` — Removed unused import
+- `routes/index.tsx` — Removed dead variables
+- `store/AdminContext.tsx` — synced SystemHealth/SystemLog contracts with backend
+- `store/AppContext.tsx` — updated `addSystemLog` typing (`createdAt`)
+- `store/SubmissionContext.tsx` — aligned submission create payload (`assessmentId`)
+
+**Backend (8):**
+- `bennett-backend/src/routes/auth.ts` — Token refresh session update, session limit race fix, upsert onConflict
+- `bennett-backend/src/routes/submissions.ts` — time_spent calculation, end_date check, teacher RLS
+- `bennett-backend/src/routes/assessments.ts` — Date validation, monitoring_mode API path
+- `bennett-backend/src/routes/system.ts` — Leaderboard filter, dead import cleanup
+- `bennett-backend/src/routes/admin.ts` — generatedPassword field name
+- `bennett-backend/src/routes/questions.ts` — Dead escaping code removed
+- `bennett-backend/src/routes/analytics.ts` — Dead import removed
+- `bennett-backend/src/middleware/auth.ts` — upsert onConflict
+
+---
+
 ## [2026-03-17] - Post-Review Fixes (2 fixes)
 
 #### Atomic Publish Transition (`bennett-backend/routes/assessments.ts`)

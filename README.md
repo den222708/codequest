@@ -19,6 +19,11 @@ This repository contains:
 - Notifications, activity logs, backups, system health, and leaderboard endpoints
 - Security hardening: JWT auth, lockout, token blacklist, session timeout, password history, RLS
 
+DevTools protection note:
+
+- The app currently uses custom proctoring heuristics in `services/monitoringService.ts` (`devtools_open` violation events).
+- `disable-devtool` package integration is not enabled in runtime code yet (guide exists at `md files/disable-devtool-guide.md`).
+
 ## Architecture
 
 ```text
@@ -118,6 +123,8 @@ Notes:
 - It inserts placeholder UUIDs for auth-linked profile rows because SQL Editor cannot create `auth.users` directly.
 - After creating auth users in Supabase Dashboard, update profile mappings:
 
+If you previously downloaded an older `master.sql`, use the latest file from this repo before running. Older variants can fail in hosted Supabase SQL Editor.
+
 ```sql
 UPDATE profiles
 SET user_id = '<real-auth-user-uuid>'
@@ -127,6 +134,20 @@ UPDATE profiles
 SET user_id = '<real-auth-user-uuid>'
 WHERE email = 'sanchit@bennett.edu.in';
 ```
+
+Common SQL bootstrap errors:
+
+- `ERROR: 42501 permission denied: "RI_ConstraintTrigger..." is a system trigger`
+  - Cause: older script version tried `ALTER TABLE ... DISABLE TRIGGER ALL`.
+  - Fix: latest `master.sql` removes trigger toggling and re-applies `profiles_user_id_fkey` as `NOT VALID` after seeding.
+- `ERROR: 22P02 invalid input syntax for type uuid: "t000..."`
+  - Cause: non-hex placeholder UUID prefixes in older script variants.
+  - Fix: latest `master.sql` uses valid hex-only placeholder UUIDs for teacher/student/question seeds.
+- `token_blacklist` appears with RLS disabled
+  - Cause: table was created from an older SQL version.
+  - Fix: run `ALTER TABLE public.token_blacklist ENABLE ROW LEVEL SECURITY;`
+
+If you hit any of these issues after a partial run, reset the Supabase database (or drop created objects) and rerun the latest `master.sql` from the start.
 
 ### 4) Start services
 

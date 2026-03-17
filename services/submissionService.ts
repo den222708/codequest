@@ -17,16 +17,19 @@ export const submissionService = {
   },
 
   async getByUser(userId: string): Promise<Submission[]> {
-    const data = await api.get<any[]>(`/submissions/user/${userId}`);
+    const params = new URLSearchParams();
+    params.set('studentId', userId);
+    const data = await api.get<any[]>(`/submissions?${params.toString()}`);
     return data.map(mapSubmission);
   },
 
   async create(submission: {
     code: string;
     language: string;
-    userId: string;
     questionId: string;
+    assessmentId: string;
     attemptId?: string;
+    answer?: string;
     status?: string;
     score?: number;
     results?: any;
@@ -66,13 +69,13 @@ function mapSubmissionStatus(status?: string): Submission['status'] {
   if (!status) return 'pending';
   const map: Record<string, Submission['status']> = {
     pending: 'pending',
-    running: 'running',
+    running: 'pending',
     passed: 'passed',
     failed: 'failed',
     error: 'error',
-    accepted: 'passed',
-    rejected: 'failed',
-    wrong_answer: 'failed',
+    accepted: 'accepted',
+    rejected: 'rejected',
+    wrong_answer: 'wrong_answer',
     partial: 'partial',
     completed: 'passed',
     'timed-out': 'error',

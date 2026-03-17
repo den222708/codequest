@@ -23,7 +23,7 @@ const settingsSchema = z.object({
   proctoring: z.boolean().default(false),
 });
 
-const assessmentSchema = z.object({
+const assessmentBaseSchema = z.object({
   title: z.string().min(3).max(200),
   description: z.string().min(5),
   type: z.enum(["quiz", "exam", "assignment", "practice"]),
@@ -37,7 +37,13 @@ const assessmentSchema = z.object({
   settings: settingsSchema.default({}),
   courseCode: z.string().optional(),
   courseName: z.string().optional(),
+  monitoringMode: z.enum(["standard", "proctored"]).optional(),
 });
+
+const assessmentSchema = assessmentBaseSchema.refine(
+  (data) => !data.startDate || !data.endDate || new Date(data.startDate) < new Date(data.endDate),
+  { message: "startDate must be before endDate", path: ["endDate"] }
+);
 
 // ── GET /assessments ──────────────────────────────────────────────────
 assessments.get("/", async (c) => {
@@ -212,6 +218,7 @@ assessments.post("/", requireRole("teacher", "admin"), async (c) => {
       created_by: user.id,
       course_code: d.courseCode ?? null,
       course_name: d.courseName ?? null,
+      ...(d.monitoringMode ? { monitoring_mode: d.monitoringMode } : {}),
     })
     .select()
     .single();
@@ -242,7 +249,7 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
   const user = c.get("user") as AuthUser;
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
-  const parsed = assessmentSchema.partial().safeParse(body);
+  const parsed = assessmentBaseSchema.partial().safeParse(body);
   if (!parsed.success) return sendError(c, 400, parsed.error.errors[0].message);
 
   const supabase = getSupabaseAdmin();
@@ -269,6 +276,7 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
   if (d.settings) updates.settings = d.settings;
   if (d.courseCode !== undefined) updates.course_code = d.courseCode;
   if (d.courseName !== undefined) updates.course_name = d.courseName;
+  if (d.monitoringMode !== undefined) updates.monitoring_mode = d.monitoringMode;
 
   // Also accept status changes
   const statusVal = body?.status;
@@ -528,6 +536,7 @@ function mapAssessment(row: any) {
     createdAt: row.created_at,
     courseCode: row.course_code,
     courseName: row.course_name,
+    monitoringMode: row.monitoring_mode ?? "standard",
     professorName: row.profiles?.name ?? "",
     questions: row.assessment_questions?.map((aq: any) => ({
       ...(aq.questions ? mapAqQuestion(aq.questions) : {}),

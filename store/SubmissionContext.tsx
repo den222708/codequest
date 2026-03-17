@@ -91,7 +91,7 @@ export const SubmissionProvider: React.FC<{ children: ReactNode }> = ({ children
         persisted = await submissionService.create({
           code,
           language,
-          userId: currentUser.id,
+          assessmentId: _currentAssessmentIdRef.current || '',
           questionId,
           attemptId: _currentAttemptIdRef.current || undefined,
           status,

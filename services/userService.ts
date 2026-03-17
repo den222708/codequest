@@ -29,7 +29,7 @@ export interface BulkCreateResult {
 export const userService = {
   async getAll(filters?: { role?: string; status?: string; search?: string }): Promise<User[]> {
     const params = new URLSearchParams();
-    if (filters?.role) params.set('role', filters.role);
+    if (filters?.role) params.set('role', filters.role === 'professor' ? 'teacher' : filters.role);
     if (filters?.status) params.set('status', filters.status);
     if (filters?.search) params.set('search', filters.search);
     const qs = params.toString();
