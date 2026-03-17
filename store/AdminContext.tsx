@@ -70,8 +70,8 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         userService.getAll().then(data => setUsers(data)).catch(() => {});
         api.get('/system/logs?limit=100').then((data: any) => setSystemLogs(Array.isArray(data) ? data : [])).catch(() => {});
         api.get('/system/stats').then((data: any) => {
-          if (data?.leaderboard) setLeaderboard(data.leaderboard);
-          if (data?.activeSessions) setActiveSessions(data.activeSessions);
+          if (Array.isArray(data?.leaderboard)) setLeaderboard(data.leaderboard);
+          if (Array.isArray(data?.activeSessions)) setActiveSessions(data.activeSessions);
         }).catch(() => {});
       }
       if (isAdmin || user.role === 'professor') {

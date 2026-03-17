@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-03-17] - Post-Review Fixes (2 fixes)
+
+#### Atomic Publish Transition (`bennett-backend/routes/assessments.ts`)
+- **Severity:** MEDIUM
+- **Fix:** Replaced separate read-then-update with a single atomic update using `.neq("status", "published")`. Only the request that actually transitions status to "published" fires the notification. Concurrent requests that lose the race skip the notification and apply only non-status updates.
+
+#### Leaderboard & Active Sessions in /system/stats (`bennett-backend/routes/system.ts`, `store/AdminContext.tsx`)
+- **Severity:** MEDIUM
+- **Fix:** `/system/stats` now returns `leaderboard` (top 20 students by aggregated submission score) and `activeSessions` (from `active_sessions` table). AdminContext loader updated with `Array.isArray` guards.
+
+### Verification
+- `npx tsc --noEmit` (frontend): PASS
+- `npx tsc --noEmit` (backend): PASS
+
+---
+
 ## [2026-03-17] - Deep Bug Sweep (16 fixes)
 
 ### Critical Fixes

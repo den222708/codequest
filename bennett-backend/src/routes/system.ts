@@ -417,10 +417,67 @@ system.get("/stats", requireRole("admin"), async (c) => {
     supabase.from("submissions").select("*", { count: "exact", head: true }),
   ]);
 
+  // Fetch leaderboard (top 20 students by total score) and active sessions
+  const [{ data: leaderboardRows }, { data: sessionRows }] = await Promise.all([
+    supabase
+      .from("submissions")
+      .select("student_id, score, profiles!submissions_student_id_fkey(name, department)")
+      .order("score", { ascending: false })
+      .limit(200),
+    supabase
+      .from("active_sessions")
+      .select("id, user_id, last_active_at, profiles!active_sessions_user_id_fkey(name)")
+      .order("last_active_at", { ascending: false })
+      .limit(50),
+  ]);
+
+  // Aggregate leaderboard: sum scores per student, rank by total
+  const studentScores = new Map<string, { name: string; department: string; totalScore: number; problemsSolved: number }>();
+  for (const row of leaderboardRows ?? []) {
+    const sid = row.student_id;
+    const existing = studentScores.get(sid);
+    const profile = (row as any).profiles;
+    if (existing) {
+      existing.totalScore += row.score ?? 0;
+      existing.problemsSolved += 1;
+    } else {
+      studentScores.set(sid, {
+        name: profile?.name ?? "Unknown",
+        department: profile?.department ?? "",
+        totalScore: row.score ?? 0,
+        problemsSolved: 1,
+      });
+    }
+  }
+  const leaderboard = [...studentScores.entries()]
+    .sort((a, b) => b[1].totalScore - a[1].totalScore)
+    .slice(0, 20)
+    .map(([id, s], idx) => ({
+      rank: idx + 1,
+      id,
+      name: s.name,
+      avatar: s.name.split(" ").filter(Boolean).map(n => n[0]).join("").toUpperCase(),
+      department: s.department,
+      totalScore: s.totalScore,
+      problemsSolved: s.problemsSolved,
+      averageTime: 0,
+      streak: 0,
+      badges: [],
+    }));
+
+  const activeSessions = (sessionRows ?? []).map((s: any) => ({
+    id: s.id,
+    userId: s.user_id,
+    userName: s.profiles?.name ?? "Unknown",
+    lastActiveAt: s.last_active_at,
+  }));
+
   return sendSuccess(c, {
     users: { total: totalUsers ?? 0, active: activeUsers ?? 0 },
     assessments: { total: totalAssessments ?? 0, active: activeAssessments ?? 0 },
     submissions: { total: totalSubmissions ?? 0 },
+    leaderboard,
+    activeSessions,
     cache: cacheStats(),
     memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
     uptimeSeconds: Math.round(process.uptime()),

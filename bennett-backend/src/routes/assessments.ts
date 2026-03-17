@@ -276,31 +276,51 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
     updates.status = statusVal;
   }
 
-  // Track if this is a publish transition (for notification)
+  // Detect publish transition atomically using .neq("status","published")
+  // so only one concurrent request can win the transition and fire the notification.
   let wasPublished = false;
+  let data: any;
+
   if (statusVal === "published") {
-    // Use a single atomic update with a status guard to prevent TOCTOU races
-    const { data: prev } = await supabase.from("assessments").select("status, title").eq("id", id).single();
-    if (prev && prev.status !== "published") {
+    // Attempt atomic publish: only updates rows not already published
+    const { data: transitioned, error: pubErr } = await supabase
+      .from("assessments")
+      .update(updates)
+      .eq("id", id)
+      .neq("status", "published")
+      .select()
+      .maybeSingle();
+
+    if (pubErr) return sendError(c, 500, pubErr.message);
+
+    if (transitioned) {
       wasPublished = true;
+      data = transitioned;
+    } else {
+      // Already published by another request. Apply non-status updates if any.
+      const { status: _s, ...nonStatusUpdates } = updates;
+      if (Object.keys(nonStatusUpdates).length > 0) {
+        const { data: d2, error: e2 } = await supabase
+          .from("assessments").update(nonStatusUpdates).eq("id", id).select().single();
+        if (e2) return sendError(c, 500, e2.message);
+        data = d2;
+      } else {
+        const { data: d2, error: e2 } = await supabase
+          .from("assessments").select().eq("id", id).single();
+        if (e2) return sendError(c, 500, e2.message);
+        data = d2;
+      }
     }
-  }
-
-  const { data, error } = await supabase
-    .from("assessments")
-    .update(updates)
-    .eq("id", id)
-    .select()
-    .single();
-
-  // Guard: if we expected a publish transition but status was already published (race), skip notification
-  if (wasPublished && data?.status === updates.status) {
-    // publish transition confirmed
   } else {
-    wasPublished = false;
+    const { data: d2, error } = await supabase
+      .from("assessments")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) return sendError(c, 500, error.message);
+    data = d2;
   }
-
-  if (error) return sendError(c, 500, error.message);
 
   // Update question links if provided
   if (d.questionIds && d.questionIds.length > 0) {
