@@ -178,7 +178,7 @@ export const AssessmentProvider: React.FC<{ children: ReactNode }> = ({ children
       ...currentAttempt,
       submittedAt: new Date().toISOString(),
       timeSpent: elapsedSeconds,
-      status: 'submitted' as const,
+      status: 'completed' as const,
     };
     setAttempts(prev => prev.map(a => a.id === updatedAttempt.id ? updatedAttempt : a));
     setCurrentAttempt(null);

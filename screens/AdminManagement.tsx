@@ -44,7 +44,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
             ...newUser,
             avatar: newUser.name.split(' ').map(n => n[0]).join('').toUpperCase(),
             status: 'active',
-            employeeId: `ADM${Date.now()}`,
+            enrollmentId: `ADM${Date.now()}`,
         });
         setShowAddModal(false);
         setNewUser({ name: '', email: '', role: 'admin', department: 'IT Department' });

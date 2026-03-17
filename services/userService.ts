@@ -10,7 +10,6 @@ function mapUser(raw: any): User {
     avatar: raw.avatar || raw.avatar_url || '',
     department: raw.department || '',
     enrollmentId: raw.enrollmentId || raw.enrollment_id || '',
-    employeeId: raw.employeeId || raw.employee_id || '',
     status: raw.status || 'active',
     createdAt: raw.createdAt || raw.created_at || '',
     lastLogin: raw.lastLogin || raw.last_login || undefined,

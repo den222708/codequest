@@ -94,7 +94,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       email: user.email,
       role: user.role as string,
       department: user.department,
-      enrollmentId: user.role === 'professor' ? (user.employeeId || undefined) : (user.enrollmentId || undefined),
+      enrollmentId: user.enrollmentId || undefined,
     });
     await loadUsers();
     return result;

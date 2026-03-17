@@ -41,8 +41,7 @@ export interface User {
   avatar: string;
   department?: string;
   enrollmentId?: string;
-  employeeId?: string;
-  status: 'active' | 'inactive' | 'pending';
+  status: 'active' | 'inactive';
   createdAt: string;
   lastLogin?: string;
 }
@@ -137,8 +136,8 @@ export interface Submission {
   score: number;
   maxScore: number;
   testResults: TestResult[];
-  executionTime: number; // in ms
-  memoryUsed: number; // in MB
+  executionTime?: number; // in ms — populated from Judge0, not stored in DB
+  memoryUsed?: number; // in MB — populated from Judge0, not stored in DB
   submittedAt: string;
   plagiarismScore?: number;
 }
@@ -162,7 +161,7 @@ export interface AssessmentAttempt {
   timeSpent: number; // in seconds
   score: number;
   maxScore: number;
-  status: 'in-progress' | 'submitted' | 'graded';
+  status: 'in-progress' | 'completed' | 'timed-out';
   submissions: Submission[];
 }
 

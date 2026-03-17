@@ -63,7 +63,6 @@ function mapUser(raw: any): User {
     avatar: raw.avatar || raw.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase(),
     department: raw.department,
     enrollmentId: raw.enrollmentId,
-    employeeId: raw.employeeId,
     status: raw.status?.toLowerCase() || 'active',
     createdAt: raw.createdAt || new Date().toISOString(),
     lastLogin: raw.lastLogin,

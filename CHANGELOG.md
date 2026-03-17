@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-03-17] - Frontend/DB Contract Alignment
+
+### Contract Fixes
+
+#### Canonical User ID Field (`types.ts`, `userService.ts`, `authService.ts`, `AdminContext.tsx`, `UserManagement.tsx`, `AdminManagement.tsx`)
+- **Severity:** HIGH
+- **Fix:** Removed frontend-only `employeeId` from the `User` contract. Frontend now uses one canonical field (`enrollmentId`) for all roles to match backend `profiles.enrollment_id`. UI labels still show "Employee ID" for professor/admin forms.
+
+#### User Status Enum Alignment (`types.ts`, `UserManagement.tsx`)
+- **Severity:** HIGH
+- **Fix:** Removed unsupported `'pending'` from frontend `User.status`. Frontend now matches backend `profiles.status` constraint (`'active' | 'inactive'`).
+
+#### Assessment Attempt Status Alignment (`types.ts`, `AssessmentContext.tsx`)
+- **Severity:** HIGH
+- **Fix:** Updated frontend attempt statuses to backend contract (`'in-progress' | 'completed' | 'timed-out'`). `submitAssessment()` now marks attempts as `'completed'`.
+
+#### Submission Status Mapping Hardened (`submissionService.ts`)
+- **Severity:** HIGH
+- **Fix:** Added `wrong_answer -> failed` mapping in `mapSubmissionStatus()`. Previously this backend status defaulted to `'pending'` in the UI.
+
+#### Optional Runtime Metrics in Submission Type (`types.ts`)
+- **Severity:** MEDIUM
+- **Fix:** Marked `executionTime` and `memoryUsed` as optional in `Submission` type to reflect that they are runtime execution metrics and not guaranteed persisted DB columns.
+
+### Verification
+
+- `npx tsc --noEmit`: PASS (0 errors)
+
 ## [2026-03-15] - Audit Bug Fixes & Security Hardening
 
 Fixes identified during comprehensive repository audit on 2026-03-15.

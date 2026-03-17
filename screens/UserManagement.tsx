@@ -30,8 +30,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
     role: 'student' as Role,
     department: '',
     enrollmentId: '',
-    employeeId: '',
-    status: 'active' as 'active' | 'inactive' | 'pending',
+    status: 'active' as 'active' | 'inactive',
   });
 
   useEffect(() => { loadUsers(); }, []);
@@ -60,7 +59,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
         role: formData.role,
         department: formData.department,
         enrollmentId: formData.enrollmentId || undefined,
-        employeeId: formData.employeeId || undefined,
         status: formData.status,
         avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase(),
       });
@@ -87,7 +85,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
         role: formData.role,
         department: formData.department,
         enrollmentId: formData.enrollmentId || undefined,
-        employeeId: formData.employeeId || undefined,
         status: formData.status,
       });
       setEditingUser(null);
@@ -107,7 +104,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
       role: user.role,
       department: user.department || '',
       enrollmentId: user.enrollmentId || '',
-      employeeId: user.employeeId || '',
       status: user.status,
     });
     setEditingUser(user);
@@ -121,7 +117,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
       role: 'student',
       department: '',
       enrollmentId: '',
-      employeeId: '',
       status: 'active',
     });
   };
@@ -130,7 +125,6 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
     switch (status) {
       case 'active': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
       case 'inactive': return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400';
-      case 'pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
       default: return 'bg-slate-100 text-slate-600';
     }
   };
@@ -261,7 +255,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
                   </div>
                 </td>
                 <td className="p-4 text-slate-600 dark:text-slate-400">
-                  {user.enrollmentId || user.employeeId || '-'}
+                  {user.enrollmentId || '-'}
                 </td>
                 <td className="p-4 text-sm text-slate-500">
                   {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
@@ -382,8 +376,8 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
                   <label className="block text-sm font-semibold mb-2">Employee ID</label>
                   <input
                     type="text"
-                    value={formData.employeeId}
-                    onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                    value={formData.enrollmentId}
+                    onChange={(e) => setFormData({ ...formData, enrollmentId: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
                   />
                 </div>

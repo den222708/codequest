@@ -72,6 +72,7 @@ function mapSubmissionStatus(status?: string): Submission['status'] {
     error: 'error',
     accepted: 'passed',
     rejected: 'failed',
+    wrong_answer: 'failed',
     partial: 'partial',
     completed: 'passed',
     'timed-out': 'error',
