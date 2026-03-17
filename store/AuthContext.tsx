@@ -10,7 +10,7 @@ export interface AuthContextType {
   isDemoMode: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (name: string, email: string, password: string, role: Role) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   setRole: (role: Role) => void;
   startDemoMode: () => Promise<void>;
   hasPermission: (permission: keyof RolePermissions) => boolean;

@@ -65,8 +65,8 @@ export const exportAssessmentResultsCSV = (
       sub.maxScore.toString(),
       `${percentage}%`,
       sub.status,
-      sub.executionTime.toFixed(2),
-      sub.memoryUsed.toFixed(2),
+      (sub.executionTime ?? 0).toFixed(2),
+      (sub.memoryUsed ?? 0).toFixed(2),
       new Date(sub.submittedAt).toLocaleString(),
     ];
   });
@@ -277,7 +277,7 @@ export const exportAssessmentResultsPDF = (
         <td>${question?.title || 'Unknown'}</td>
         <td>${sub.score}/${sub.maxScore} (${percentage}%)</td>
         <td class="${statusClass}">${sub.status.toUpperCase()}</td>
-        <td>${sub.executionTime.toFixed(0)}ms</td>
+        <td>${(sub.executionTime ?? 0).toFixed(0)}ms</td>
         <td>${new Date(sub.submittedAt).toLocaleDateString()}</td>
       </tr>
     `;

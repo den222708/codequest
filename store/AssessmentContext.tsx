@@ -167,7 +167,7 @@ export const AssessmentProvider: React.FC<{ children: ReactNode }> = ({ children
     } catch (err) {
       console.error('Failed to start assessment:', err);
     }
-  }, [assessments, attempts, currentUser, _addNotification]);
+  }, [assessments, attempts, currentUser]);
 
   const submitAssessment = useCallback(async () => {
     // This will be wired by the bridge to access submissions

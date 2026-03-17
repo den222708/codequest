@@ -42,7 +42,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
         if (!canManageAdmins) return;
         onAddUser({
             ...newUser,
-            avatar: newUser.name.split(' ').map(n => n[0]).join('').toUpperCase(),
+            avatar: (newUser.name || 'A').split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase(),
             status: 'active',
             enrollmentId: `ADM${Date.now()}`,
         });

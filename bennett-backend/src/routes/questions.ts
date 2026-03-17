@@ -97,8 +97,11 @@ questions.get("/", async (c) => {
   if (difficulty) query = query.eq("difficulty", difficulty);
   if (topic) query = query.eq("topic", topic);
   if (search) {
-    const safe = search.replace(/[%_(),.*]/g, "");
-    if (safe) query = query.or(`title.ilike.%${safe}%,description.ilike.%${safe}%`);
+    const safe = search.replace(/[%_(),.*\\]/g, "");
+    if (safe) {
+      const escaped = safe.replace(/%/g, "\\%").replace(/_/g, "\\_");
+      query = query.or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+    }
   }
 
   query = query.order("created_at", { ascending: false });

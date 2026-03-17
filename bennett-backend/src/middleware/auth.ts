@@ -75,14 +75,12 @@ export async function authMiddleware(c: Context, next: Next) {
       return c.json({ success: false, error: "Session expired due to inactivity" }, 401);
     }
 
-    // Update last_active_at (fire-and-forget to avoid slowing requests)
-    supabase
+    // Update last_active_at — awaited to ensure session timeout checks use fresh data
+    const { error: updateErr } = await supabase
       .from("active_sessions")
       .update({ last_active_at: new Date().toISOString() })
-      .eq("id", session.id)
-      .then(({ error: updateErr }) => {
-        if (updateErr) log.error({ err: updateErr }, "active_sessions update failed");
-      });
+      .eq("id", session.id);
+    if (updateErr) log.error({ err: updateErr }, "active_sessions update failed");
   }
   // Note: if no session record found (e.g. legacy tokens before this feature),
   // we still allow the request — the session table is populated on new logins.

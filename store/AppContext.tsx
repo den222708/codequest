@@ -35,7 +35,7 @@ export interface AppContextType {
   isDemoMode: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (name: string, email: string, password: string, role: Role) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   setRole: (role: Role) => void;
   startDemoMode: () => Promise<void>;
   hasPermission: (permission: keyof RolePermissions) => boolean;
@@ -145,7 +145,8 @@ const ContextWiring: React.FC<{ children: ReactNode }> = ({ children }) => {
       assessments._setCurrentAttempt(null);
       submissions._setSubmissions([]);
     }
-  }, [auth.isAuthenticated, questions, assessments, submissions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.isAuthenticated]);
 
   return <>{children}</>;
 };

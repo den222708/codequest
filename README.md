@@ -9,7 +9,7 @@ A university coding assessment platform with Monaco Editor, role-based access (S
 ## Stack
 
 - **Frontend** — React 19, TypeScript, Vite, Monaco Editor, React Router v7, Recharts
-- **Backend** — Node.js, Express, Prisma (SQLite dev / PostgreSQL prod), JWT auth
+- **Backend** — Node.js, Hono, Supabase (PostgreSQL), JWT auth
 - **Code Execution** — [Programiz](https://www.programiz.com/online-compiler/) WebSocket proxy (primary, no API key required) with optional Judge0 fallback
 
 ---
@@ -43,37 +43,27 @@ npm run dev
 
 ---
 
-### 2. Backend
+### 2. Backend (bennett-backend)
 
 ```bash
-cd backend
+cd bennett-backend
 npm install
 ```
 
-Create `backend/.env`:
+Create `bennett-backend/.env` (see `.env.example` for all options):
 
 ```env
 PORT=3001
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 JWT_SECRET=your-secret-here
-DATABASE_URL=file:./prisma/dev.db
 
 # Execution provider: programiz | auto | self-host | rapidapi
-# Defaults to "auto" (Programiz first, Judge0 fallback if configured)
 EXECUTOR_PROVIDER=programiz
-
-# Optional Judge0 fallback (for languages Programiz doesn't support)
-# JUDGE0_BASE_URL=http://localhost:2358
-# JUDGE0_RAPIDAPI_KEY=your-rapidapi-key
 ```
 
-Run migrations and seed:
-
-```bash
-npm run db:migrate
-npm run db:seed
-```
-
-Start the backend:
+Apply the schema to your Supabase project using `supabase/master.sql`, then start:
 
 ```bash
 npm run dev
@@ -118,5 +108,5 @@ For languages outside the Programiz set, configure a Judge0 instance via `JUDGE0
 npm run build
 
 # Backend
-cd backend && npm run build
+cd bennett-backend && npm run build
 ```

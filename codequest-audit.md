@@ -24,16 +24,22 @@
 - Zod validation added for auth, users, questions, assessments, submissions, execute, analytics, system logs.
 - Build now passes after type shims and schema updates.
 
-## Remaining gaps (priority) — Updated 2026-03-11
+## Remaining gaps (priority) — Updated 2026-03-17
 - ~~Persist lockout/refresh blacklist and enforce session timeout~~ — **DONE** (token blacklist, 30-min timeout, lockout after 5 attempts, concurrent session limit)
 - ~~Align role/status enums end-to-end~~ — **DONE** (3-role model: student/teacher|professor/admin)
 - ~~Replace simulated executor~~ — **DONE** (Programiz primary, Judge0 fallback)
 - ~~Notification backend~~ — **DONE** (CRUD endpoints in bennett-backend)
 - ~~Password history + expiry~~ — **DONE** (cannot reuse last 5, 90-day expiry)
+- ~~Add real plagiarism detection~~ — **DONE** (winnowing algorithm, server-side scan via /system/plagiarism/scan/:assessmentId)
+- ~~Add WebSocket live-monitor pipeline~~ — **DONE** (Socket.IO /proctoring + /admin namespaces, monitoring_events table)
+- ~~Add structured logging, error tracking, observability~~ — **DONE** (Pino structured logging, Sentry integration, cleanup jobs)
+- ~~Fix broken imports (plagiarismService, AdminContext)~~ — **DONE** (named→default import fix, 2026-03-17)
+- ~~Fix dead notification wiring (QuestionContext)~~ — **DONE** (wired to _addNotification from AuthContext, 2026-03-17)
+- ~~Fix always-empty admin state (systemLogs, leaderboard, activeSessions)~~ — **DONE** (added setters + API loading, 2026-03-17)
+- ~~Fix LIKE injection in question search~~ — **DONE** (escape % and _ metacharacters, 2026-03-17)
+- ~~Fix session timestamp fire-and-forget~~ — **DONE** (await session update in auth middleware, 2026-03-17)
 - Flesh out question type behavior (MCQ/short/TF/file upload) and assessment status enums.
-- Add real plagiarism detection (MOSS/Dolos integration).
-- Add WebSocket live-monitor pipeline.
-- Add structured logging, error tracking, email service, observability.
+- Add email service (welcome, reset, invite emails).
 
 ## Medium issues / polish
 - **SQLite default for production**: `DATABASE_URL` points to a local SQLite file; lacks migrations/setup for Postgres/MySQL if needed.

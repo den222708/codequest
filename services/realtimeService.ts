@@ -461,7 +461,6 @@ export const realtimeService = new RealtimeService();
  */
 export const useRealtimeUpdates = (
   assessmentId?: string,
-  _onUpdate?: UpdateCallback
 ): {
   isConnected: boolean;
   sessions: ActiveSession[];

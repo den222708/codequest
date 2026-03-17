@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Question } from '../types';
 import { questionService } from '../services/questionService';
 import { useAuth } from './AuthContext';
@@ -19,8 +19,7 @@ const QuestionContext = createContext<QuestionContextType | undefined>(undefined
 export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const { _onLoginSuccess } = useAuth();
-  const addNotificationRef = useRef<((n: { type: string; title: string; message: string }) => void) | null>(null);
+  const { _onLoginSuccess, _addNotification } = useAuth();
 
   // Register data loader for post-login
   useEffect(() => {
@@ -41,7 +40,7 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const created = await questionService.create(question);
       setQuestions(prev => [...prev, created]);
-      addNotificationRef.current?.({ type: 'success', title: 'Question Created', message: `"${created.title}" added.` });
+      _addNotification.current?.({ type: 'success', title: 'Question Created', message: `"${created.title}" added.` });
     } catch (err) {
       console.error('Failed to create question:', err);
       const newQuestion: Question = { ...question, id: `q-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), usageCount: 0 };
@@ -65,7 +64,7 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
       setQuestions(prev => prev.filter(q => q.id !== id));
     } catch (err) {
       console.error('Failed to delete question:', err);
-      addNotificationRef.current?.({ type: 'error', title: 'Delete Failed', message: 'Could not delete the question.' });
+      _addNotification.current?.({ type: 'error', title: 'Delete Failed', message: 'Could not delete the question.' });
     }
   }, []);
 

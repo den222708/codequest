@@ -19,7 +19,7 @@ const SubmissionContext = createContext<SubmissionContextType | undefined>(undef
 
 export const SubmissionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const { currentUser, isDemoMode, _onLoginSuccess, _addNotification } = useAuth();
+  const { currentUser, isDemoMode, _onLoginSuccess } = useAuth();
   const isDemoModeRef = useRef(isDemoMode);
 
   const _questionsRef = useRef<Question[]>([]);
@@ -123,7 +123,7 @@ export const SubmissionProvider: React.FC<{ children: ReactNode }> = ({ children
 
     setSubmissions(prev => [...prev, submission]);
     return submission;
-  }, [currentUser, _addNotification]);
+  }, [currentUser]);
 
   const _setSubmissions = useCallback((s: Submission[]) => setSubmissions(s), []);
 

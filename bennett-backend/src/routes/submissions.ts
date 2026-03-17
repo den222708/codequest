@@ -143,9 +143,16 @@ submissions.post("/", requireRole("student"), async (c) => {
   if (error) return sendError(c, 500, error.message);
 
   // Notify student of test results (fire-and-forget)
+  // Fetch assessment title for the notification
+  const { data: assessmentRow } = await supabase
+    .from("assessments")
+    .select("title")
+    .eq("id", assessmentId)
+    .single();
+
   notifySubmissionGraded(
     user.id,
-    (question as any).title ?? "Question",
+    assessmentRow?.title ?? "Assessment",
     (question as any).title ?? "Question",
     testsPassed,
     testsTotal,

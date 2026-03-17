@@ -533,5 +533,5 @@ export interface ClassStudent {
   enrollmentId: string;
   department: string;
   avatar: string;
-  status: string;
+  status: 'active' | 'inactive';
 }

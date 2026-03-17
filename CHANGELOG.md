@@ -1,5 +1,69 @@
 # Changelog
 
+## [2026-03-17] - Deep Bug Sweep (16 fixes)
+
+### Critical Fixes
+
+#### Named Import from Default Export (`plagiarismService.ts`, `AdminContext.tsx`)
+- **Severity:** CRITICAL
+- **Fix:** Both files used `import { api } from './apiClient'` but `apiClient.ts` uses `export default`. Changed to default import. All plagiarism and admin backup/health API calls were silently broken (api was `undefined`).
+
+#### Submission Notification Title Mismatch (`bennett-backend/routes/submissions.ts`)
+- **Severity:** CRITICAL
+- **Fix:** `notifySubmissionGraded()` passed `question.title` for both `assessmentTitle` and `questionTitle` parameters. Now fetches actual assessment title from DB.
+
+#### Dead Notification Ref Wired (`QuestionContext.tsx`)
+- **Severity:** CRITICAL
+- **Fix:** `addNotificationRef` was a local ref never connected to the notification system. Replaced with `_addNotification` from `useAuth()`. Question create/delete notifications now fire correctly.
+
+#### Admin State Variables Always Empty (`AdminContext.tsx`)
+- **Severity:** CRITICAL
+- **Fix:** `systemLogs`, `leaderboard`, and `activeSessions` had no setter functions. Added setters and wired API loading on admin login.
+
+### High Fixes
+
+#### `.toFixed()` on Undefined (`exportService.ts`)
+- **Severity:** HIGH
+- **Fix:** Added `?? 0` guards before `.toFixed()` calls on optional `executionTime` and `memoryUsed` fields in CSV and HTML export paths.
+
+#### Async Logout Typed as Sync (`AuthContext.tsx`, `AppContext.tsx`)
+- **Severity:** HIGH
+- **Fix:** `logout: () => void` changed to `logout: () => Promise<void>` to match async implementation. Callers can now properly await logout.
+
+#### Missing Assessment Type/Status Fallbacks (`assessmentService.ts`)
+- **Severity:** HIGH
+- **Fix:** `raw.type?.toLowerCase()` and `raw.status?.toLowerCase()` could return `undefined`. Added `|| 'quiz'` and `|| 'draft'` fallbacks.
+
+### Medium Fixes
+
+#### LIKE Wildcards Not Escaped (`bennett-backend/routes/questions.ts`)
+- **Severity:** MEDIUM
+- **Fix:** Search query now escapes `%` and `_` LIKE metacharacters after sanitization.
+
+#### TOCTOU Race on Publish Transition (`bennett-backend/routes/assessments.ts`)
+- **Severity:** MEDIUM
+- **Fix:** Added post-update guard to verify publish transition before firing notification.
+
+#### Fire-and-Forget Session Update (`bennett-backend/middleware/auth.ts`)
+- **Severity:** MEDIUM
+- **Fix:** Session `last_active_at` update now awaited instead of fire-and-forget, ensuring accurate inactivity timeout checks.
+
+#### Over-Broad Dependency Array (`AppContext.tsx`)
+- **Severity:** MEDIUM
+- **Fix:** Logout-reset effect narrowed from `[auth.isAuthenticated, questions, assessments, submissions]` to `[auth.isAuthenticated]`.
+
+### Low Fixes
+
+- `ClassStudent.status` narrowed from `string` to `'active' | 'inactive'` (`types.ts`)
+- Removed unused `_addNotification` from `startAssessment` and `submitCode` dependency arrays (`AssessmentContext.tsx`, `SubmissionContext.tsx`)
+- Added empty-name guard for avatar generation (`AdminManagement.tsx`)
+- Removed unused `_onUpdate` parameter from `useRealtimeUpdates()` (`realtimeService.ts`)
+
+### Verification
+- `npx tsc --noEmit`: PASS (0 errors)
+
+---
+
 ## [2026-03-17] - Frontend/DB Contract Alignment
 
 ### Contract Fixes

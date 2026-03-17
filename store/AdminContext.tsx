@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { User, ClassInfo, SystemLog, SystemHealth, Backup, LeaderboardEntry, PlagiarismResult, PlagiarismScanSummary, ActiveSession } from '../types';
 import { userService, CreateUserResult } from '../services/userService';
 import { classService } from '../services/classService';
-import { api } from '../services/apiClient';
+import api from '../services/apiClient';
 import { useAuth } from './AuthContext';
 
 export interface AdminContextType {
@@ -51,14 +51,14 @@ const AdminContext = createContext<AdminContextType | undefined>(undefined);
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
-  const [systemLogs] = useState<SystemLog[]>([]);
+  const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
   const [systemHealth, setSystemHealth] = useState<SystemHealth>(defaultHealth);
   const [backups, setBackups] = useState<Backup[]>([]);
-  const [leaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [plagiarismResults, setPlagiarismResults] = useState<PlagiarismResult[]>([]);
   const [plagiarismSummary, setPlagiarismSummary] = useState<PlagiarismScanSummary | null>(null);
   const [plagiarismScanning, setPlagiarismScanning] = useState(false);
-  const [activeSessions] = useState<ActiveSession[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
 
   const { currentUser, _onLoginSuccess, _addNotification } = useAuth();
 
@@ -68,6 +68,11 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const isAdmin = user.role === 'admin';
       if (isAdmin) {
         userService.getAll().then(data => setUsers(data)).catch(() => {});
+        api.get('/system/logs?limit=100').then((data: any) => setSystemLogs(Array.isArray(data) ? data : [])).catch(() => {});
+        api.get('/system/stats').then((data: any) => {
+          if (data?.leaderboard) setLeaderboard(data.leaderboard);
+          if (data?.activeSessions) setActiveSessions(data.activeSessions);
+        }).catch(() => {});
       }
       if (isAdmin || user.role === 'professor') {
         classService.getAll().then(data => setClasses(data)).catch(() => {});

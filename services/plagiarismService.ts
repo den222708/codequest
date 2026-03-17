@@ -1,5 +1,5 @@
 import { PlagiarismResult, PlagiarismScanSummary } from '../types';
-import { api } from './apiClient';
+import api from './apiClient';
 
 /**
  * Plagiarism Detection Service — thin client that delegates to the

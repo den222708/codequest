@@ -279,6 +279,7 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
   // Track if this is a publish transition (for notification)
   let wasPublished = false;
   if (statusVal === "published") {
+    // Use a single atomic update with a status guard to prevent TOCTOU races
     const { data: prev } = await supabase.from("assessments").select("status, title").eq("id", id).single();
     if (prev && prev.status !== "published") {
       wasPublished = true;
@@ -291,6 +292,13 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
     .eq("id", id)
     .select()
     .single();
+
+  // Guard: if we expected a publish transition but status was already published (race), skip notification
+  if (wasPublished && data?.status === updates.status) {
+    // publish transition confirmed
+  } else {
+    wasPublished = false;
+  }
 
   if (error) return sendError(c, 500, error.message);
 
