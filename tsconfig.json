@@ -28,8 +28,7 @@
   },
   "exclude": [
     "api-test",
-    "backend",
-    "bennett-backend/dist",
+    "bennett-backend",
     "node_modules"
   ]
 }

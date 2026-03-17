@@ -45,18 +45,18 @@ export const submissionService = {
 function mapSubmission(s: any): Submission {
   return {
     id: s.id,
-    assessmentId: s.assessmentId || s.assessment_id || '',
-    questionId: s.questionId || s.question_id || '',
-    studentId: s.studentId || s.student_id || s.userId || '',
+    assessmentId: s.assessmentId || '',
+    questionId: s.questionId || '',
+    studentId: s.studentId || '',
     code: s.code,
     language: s.language,
     status: mapSubmissionStatus(s.status),
     score: s.score || 0,
-    maxScore: s.maxScore || s.max_score || 100,
-    testResults: s.test_results || s.results?.testResults || s.testResults || [],
+    maxScore: s.maxScore || 100,
+    testResults: s.testResults || [],
     executionTime: s.executionTime || 0,
     memoryUsed: s.memoryUsed || 0,
-    submittedAt: s.submittedAt || s.created_at || s.createdAt || new Date().toISOString(),
+    submittedAt: s.createdAt || new Date().toISOString(),
     plagiarismScore: s.plagiarismScore,
   };
 }

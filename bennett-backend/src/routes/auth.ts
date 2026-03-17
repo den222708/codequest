@@ -1,11 +1,24 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
-import { hashToken } from "../middleware/auth.js";
-import type { AppRole } from "../middleware/auth.js";
+import { hashToken, authMiddleware } from "../middleware/auth.js";
+import { rateLimit, RATE_LIMITS } from "../middleware/rateLimit.js";
+import { createChildLogger } from "../lib/logger.js";
+import type { AppRole, AuthUser } from "../middleware/auth.js";
+import type { AppEnv } from "../lib/env.js";
 
-const auth = new Hono();
+const log = createChildLogger({ module: "auth" });
+
+const auth = new Hono<AppEnv>();
+
+// ── Auth rate limiter (applied to login, signup, forgot-password) ─────
+const authRateLimit = rateLimit({
+  max: RATE_LIMITS.AUTH,
+  windowMs: 60_000,
+  keyPrefix: "auth",
+});
 
 // ── Lockout configuration ─────────────────────────────────────────────
 const MAX_FAILED_ATTEMPTS = 5;
@@ -109,7 +122,7 @@ async function enforceSessionLimit(supabase: ReturnType<typeof getSupabaseAdmin>
 }
 
 // ── POST /auth/login ──────────────────────────────────────────────────
-auth.post("/login", async (c) => {
+auth.post("/login", authRateLimit, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
@@ -153,7 +166,7 @@ auth.post("/login", async (c) => {
     action: "login",
     details: { method: "password" },
     ip_address: clientIp,
-  }).then(({ error: logErr }) => { if (logErr) console.error("activity_log insert failed:", logErr.message); });
+  }).then(({ error: logErr }) => { if (logErr) log.error({ err: logErr }, "activity_log insert failed"); });
 
   return sendSuccess(c, {
     user: {
@@ -175,7 +188,7 @@ auth.post("/login", async (c) => {
 });
 
 // ── POST /auth/signup ─────────────────────────────────────────────────
-auth.post("/signup", async (c) => {
+auth.post("/signup", authRateLimit, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = signupSchema.safeParse(body);
   if (!parsed.success) {
@@ -224,7 +237,7 @@ auth.post("/signup", async (c) => {
     action: "signup",
     details: { role },
     ip_address: c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
-  }).then(({ error: logErr }) => { if (logErr) console.error("activity_log insert failed:", logErr.message); });
+  }).then(({ error: logErr }) => { if (logErr) log.error({ err: logErr }, "activity_log insert failed"); });
 
   // Sign in immediately so the frontend receives a session (same shape as login)
   const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
@@ -273,7 +286,7 @@ auth.post("/logout", async (c) => {
       revoked_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
     }).then(({ error }) => {
-      if (error) console.error("token_blacklist upsert failed:", error.message);
+      if (error) log.error({ err: error }, "token_blacklist upsert failed");
     });
 
     // Remove from active sessions
@@ -282,7 +295,7 @@ auth.post("/logout", async (c) => {
       .eq("user_id", userData.user.id)
       .eq("token_hash", tokenHash)
       .then(({ error }) => {
-        if (error) console.error("active_sessions delete failed:", error.message);
+        if (error) log.error({ err: error }, "active_sessions delete failed");
       });
 
     await supabase.from("activity_logs").insert({
@@ -290,7 +303,7 @@ auth.post("/logout", async (c) => {
       action: "logout",
       details: {},
       ip_address: c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
-    }).then(({ error: logErr }) => { if (logErr) console.error("activity_log insert failed:", logErr.message); });
+    }).then(({ error: logErr }) => { if (logErr) log.error({ err: logErr }, "activity_log insert failed"); });
   }
 
   return sendSuccess(c, { message: "Logged out successfully" });
@@ -318,7 +331,7 @@ auth.post("/refresh", async (c) => {
 });
 
 // ── POST /auth/forgot-password ────────────────────────────────────────
-auth.post("/forgot-password", async (c) => {
+auth.post("/forgot-password", authRateLimit, async (c) => {
   const body = await c.req.json().catch(() => null);
   const email = body?.email;
   if (!email || typeof email !== "string") {
@@ -332,6 +345,113 @@ auth.post("/forgot-password", async (c) => {
 
   // Always return success to avoid email enumeration
   return sendSuccess(c, { message: "If an account exists, a reset email has been sent" });
+});
+
+// ── Password strength validation schema (reusable) ────────────────────
+const passwordSchema = z
+  .string()
+  .min(8)
+  .regex(/[A-Z]/, "Must contain an uppercase letter")
+  .regex(/[a-z]/, "Must contain a lowercase letter")
+  .regex(/[0-9]/, "Must contain a digit")
+  .regex(/[^A-Za-z0-9]/, "Must contain a special character");
+
+// ── Helper: hash password for history comparison ──────────────────────
+function hashPassword(password: string): string {
+  return createHash("sha256").update(password).digest("hex");
+}
+
+// ── Helper: check password against history ────────────────────────────
+const PASSWORD_HISTORY_LIMIT = 5;
+
+async function isPasswordReused(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+  newPassword: string
+): Promise<boolean> {
+  const newHash = hashPassword(newPassword);
+  const { data } = await supabase
+    .from("password_history")
+    .select("password_hash")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(PASSWORD_HISTORY_LIMIT);
+
+  return (data ?? []).some((row) => row.password_hash === newHash);
+}
+
+async function recordPasswordInHistory(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+  password: string
+): Promise<void> {
+  const pwHash = hashPassword(password);
+  await supabase.from("password_history").insert({
+    user_id: userId,
+    password_hash: pwHash,
+  });
+
+  // Prune old entries beyond limit
+  const { data: allHistory } = await supabase
+    .from("password_history")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (allHistory && allHistory.length > PASSWORD_HISTORY_LIMIT) {
+    const toDelete = allHistory.slice(PASSWORD_HISTORY_LIMIT).map((h) => h.id);
+    await supabase.from("password_history").delete().in("id", toDelete);
+  }
+}
+
+// ── POST /auth/change-password ──────────────────────────────────────
+auth.post("/change-password", authMiddleware, async (c) => {
+  const user = c.get("user") as AuthUser;
+  const body = await c.req.json().catch(() => null);
+  const currentPassword = body?.currentPassword;
+  const newPassword = body?.newPassword;
+
+  if (!currentPassword || !newPassword) {
+    return sendError(c, 400, "currentPassword and newPassword are required");
+  }
+
+  const pwParsed = passwordSchema.safeParse(newPassword);
+  if (!pwParsed.success) {
+    return sendError(c, 400, pwParsed.error.errors[0].message);
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  // Verify current password by attempting sign-in
+  const { error: verifyErr } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (verifyErr) {
+    return sendError(c, 401, "Current password is incorrect");
+  }
+
+  // Check password history
+  const reused = await isPasswordReused(supabase, user.id, newPassword);
+  if (reused) {
+    return sendError(c, 400, `Cannot reuse any of your last ${PASSWORD_HISTORY_LIMIT} passwords`);
+  }
+
+  // Update password via admin API
+  const { error: updateErr } = await supabase.auth.admin.updateUserById(user.id, {
+    password: newPassword,
+  });
+  if (updateErr) {
+    return sendError(c, 500, updateErr.message);
+  }
+
+  // Record in history and update timestamp
+  await recordPasswordInHistory(supabase, user.id, newPassword);
+  await supabase.from("profiles").update({
+    password_changed_at: new Date().toISOString(),
+  }).eq("user_id", user.id);
+
+  return sendSuccess(c, { message: "Password changed successfully" });
 });
 
 export default auth;

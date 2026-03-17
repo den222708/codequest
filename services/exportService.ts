@@ -296,7 +296,7 @@ export const exportAssessmentResultsPDF = (
     <h2>Statistics</h2>
     <ul>
       <li><strong>Total Submissions:</strong> ${totalSubmissions}</li>
-      <li><strong>Passed:</strong> ${passedSubmissions} (${((passedSubmissions / totalSubmissions) * 100).toFixed(1)}%)</li>
+      <li><strong>Passed:</strong> ${passedSubmissions} (${totalSubmissions > 0 ? ((passedSubmissions / totalSubmissions) * 100).toFixed(1) : '0.0'}%)</li>
       <li><strong>Average Score:</strong> ${avgScore.toFixed(1)}%</li>
       <li><strong>Unique Students:</strong> ${byStudent.size}</li>
     </ul>

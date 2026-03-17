@@ -7,6 +7,7 @@ function mapQuestion(q: any): Question {
     title: q.title,
     description: q.description,
     difficulty: q.difficulty?.toLowerCase() || 'medium',
+    questionType: q.questionType || 'coding',
     topic: q.topic || '',
     tags: typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []),
     points: q.points || 100,
@@ -28,6 +29,8 @@ function mapQuestion(q: any): Question {
     updatedAt: q.updatedAt || '',
     isVisible: q.isVisible !== false,
     usageCount: q.usageCount || 0,
+    options: q.options ?? null,
+    correctAnswer: q.correctAnswer ?? null,
   };
 }
 

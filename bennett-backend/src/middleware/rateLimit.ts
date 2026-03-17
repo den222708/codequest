@@ -1,5 +1,14 @@
 import { Context, Next } from "hono";
 
+// ── Environment-driven defaults ───────────────────────────────────────
+// These read from process.env at module load time; values in .env.example:
+//   RATE_LIMIT_GLOBAL=100   RATE_LIMIT_AUTH=10   RATE_LIMIT_EXECUTE=20
+export const RATE_LIMITS = {
+  GLOBAL:  parseInt(process.env.RATE_LIMIT_GLOBAL  ?? "100", 10),
+  AUTH:    parseInt(process.env.RATE_LIMIT_AUTH     ?? "10",  10),
+  EXECUTE: parseInt(process.env.RATE_LIMIT_EXECUTE ?? "20",  10),
+} as const;
+
 interface RateLimitEntry {
   count: number;
   resetAt: number;

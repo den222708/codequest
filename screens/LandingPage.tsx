@@ -518,15 +518,15 @@ const LandingPage: React.FC = () => {
                   <div className="text-center space-y-6 animate-fadeIn">
                     <div className="space-y-3 w-full max-w-sm">
                       {[
-                        { label: 'Pass Rate', value: 78, color: 'emerald' },
-                        { label: 'Avg Score', value: 85, color: 'teal' },
-                        { label: 'Completion', value: 92, color: 'purple' },
+                        { label: 'Pass Rate', value: 78, barClass: 'bg-emerald-500' },
+                        { label: 'Avg Score', value: 85, barClass: 'bg-teal-500' },
+                        { label: 'Completion', value: 92, barClass: 'bg-purple-500' },
                       ].map((stat, i) => (
                         <div key={i} className="flex items-center gap-4">
                           <span className="text-sm text-slate-600 w-24">{stat.label}</span>
                           <div className="flex-1 h-3 bg-slate-200 rounded-full overflow-hidden">
                             <div
-                              className={`h-full bg-${stat.color}-500 rounded-full transition-all duration-1000`}
+                              className={`h-full ${stat.barClass} rounded-full transition-all duration-1000`}
                               style={{ width: `${stat.value}%` }}
                             />
                           </div>

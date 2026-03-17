@@ -20,7 +20,7 @@ export const authService = {
       name,
       email,
       password,
-      role: role?.toUpperCase(),
+      role: role === 'professor' ? 'teacher' : role,
     });
     tokenStore.setTokens(data.session.accessToken, data.session.refreshToken);
     const user = mapUser(data.user);

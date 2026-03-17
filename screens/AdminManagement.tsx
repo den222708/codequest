@@ -52,18 +52,16 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
 
     const getRoleBadgeColor = (role: string) => {
         switch (role) {
-            case 'superadmin': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
             case 'admin': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-            case 'subadmin': return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400';
             default: return 'bg-slate-100 text-slate-600';
         }
     };
 
     const getRoleLabel = (role: string) => {
         switch (role) {
-            case 'superadmin': return 'Super Admin';
             case 'admin': return 'Admin';
-            case 'subadmin': return 'Sub Admin';
+            case 'professor': return 'Professor';
+            case 'student': return 'Student';
             default: return role;
         }
     };
@@ -75,7 +73,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
                     <span className="material-symbols-outlined text-5xl text-red-500 mb-4">block</span>
                     <h2 className="text-xl font-bold text-red-700 dark:text-red-400 mb-2">Access Denied</h2>
                     <p className="text-red-600 dark:text-red-300">
-                        You don't have permission to manage administrators. Only Super Admins can access this feature.
+                        You don't have permission to manage administrators.
                     </p>
                 </div>
             </div>
@@ -89,7 +87,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
                 <div>
                     <h1 className="text-3xl font-bold">Admin Management</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        Manage administrator accounts (Super Admin only)
+                        Manage administrator accounts
                     </p>
                 </div>
                 <button
@@ -230,12 +228,10 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
                                 <label className="block text-sm font-medium mb-1">Role</label>
                                 <select
                                     value={newUser.role}
-                                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as any })}
+                                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'admin' })}
                                     className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-800"
                                 >
-                                    <option value="subadmin">Sub Admin</option>
                                     <option value="admin">Admin</option>
-                                    <option value="superadmin">Super Admin</option>
                                 </select>
                             </div>
                             <div>

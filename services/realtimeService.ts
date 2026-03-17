@@ -1,272 +1,476 @@
-import { LiveUpdate, ActiveSession } from '../types';
+/**
+ * Real-time Service — Socket.IO client for proctored assessment monitoring.
+ *
+ * Two usage modes:
+ *   1. Student: connects to /proctoring, sends heartbeats/violations, receives instructions
+ *   2. Admin: connects to /admin, subscribes to assessment monitoring feeds
+ *
+ * For 'standard' mode assessments, this service is NOT used — violations are
+ * logged via REST API only.
+ */
 
-// Simulated real-time service
-// In production, this would use WebSocket connections
+import { io, Socket } from 'socket.io-client';
+import { LiveUpdate, ActiveSession } from '../types';
+import type { ViolationType } from './monitoringService';
+
+export type { ViolationType };
+
+// ── Types matching backend monitoringTypes.ts ───────────────────────────
+
+interface HeartbeatPayload {
+  attemptId: string;
+  assessmentId: string;
+  seq: number;
+  timestamp: number;
+  questionIndex: number;
+  isFullscreen: boolean;
+  isOnline: boolean;
+}
+
+interface ViolationPayload {
+  attemptId: string;
+  assessmentId: string;
+  type: ViolationType;
+  detail?: string;
+  timestamp: number;
+}
+
+interface StudentJoinPayload {
+  attemptId: string;
+  assessmentId: string;
+  studentId: string;
+  studentName: string;
+  userAgent: string;
+}
+
+interface InstructionPayload {
+  id: string;
+  type: 'warning' | 'terminate' | 'message' | 'lock';
+  message: string;
+  timestamp: number;
+}
+
+interface MonitoringSessionState {
+  socketId: string;
+  attemptId: string;
+  assessmentId: string;
+  studentId: string;
+  studentName: string;
+  joinedAt: string;
+  lastHeartbeat: string;
+  lastSeq: number;
+  gapCount: number;
+  questionIndex: number;
+  isFullscreen: boolean;
+  isOnline: boolean;
+  status: 'active' | 'idle' | 'suspicious' | 'flagged' | 'disconnected';
+  violations: {
+    tabSwitches: number;
+    pasteCount: number;
+    fullscreenExits: number;
+    clipboardAccess: number;
+    offlineEvents: number;
+    focusLost: number;
+    devtoolsOpen: number;
+    total: number;
+  };
+}
+
+interface MonitoringDashboardUpdate {
+  assessmentId: string;
+  sessions: MonitoringSessionState[];
+  timestamp: string;
+}
+
+// ── Callback types ──────────────────────────────────────────────────────
 
 type UpdateCallback = (update: LiveUpdate) => void;
 type SessionCallback = (sessions: ActiveSession[]) => void;
+type InstructionCallback = (instruction: InstructionPayload) => void;
+type DashboardCallback = (update: MonitoringDashboardUpdate) => void;
+type ViolationAlertCallback = (data: {
+  assessmentId: string;
+  attemptId: string;
+  studentName: string;
+  violation: ViolationPayload;
+}) => void;
 
-class RealtimeService {
-  private updateCallbacks: UpdateCallback[] = [];
-  private sessionCallbacks: SessionCallback[] = [];
-  private activeSessions: Map<string, ActiveSession> = new Map();
-  private updateInterval: NodeJS.Timeout | null = null;
-  private isConnected: boolean = false;
+// ── API base URL ────────────────────────────────────────────────────────
 
-  // Connect to real-time updates
-  connect() {
-    if (this.isConnected) return;
-    
-    this.isConnected = true;
-    console.log('[RealtimeService] Connected');
-    
-    // Simulate periodic updates
-    this.updateInterval = setInterval(() => {
-      this.simulateUpdates();
-    }, 5000);
+function getBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  if (envUrl) {
+    // Strip /api/v1 suffix — Socket.IO connects to the root
+    return envUrl.replace(/\/api\/v1\/?$/, '');
   }
+  return 'http://localhost:3001';
+}
 
-  // Disconnect from real-time updates
-  disconnect() {
-    if (!this.isConnected) return;
-    
-    this.isConnected = false;
-    console.log('[RealtimeService] Disconnected');
-    
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval);
-      this.updateInterval = null;
-    }
-  }
+// ── Student Client ──────────────────────────────────────────────────────
 
-  // Subscribe to live updates
-  onUpdate(callback: UpdateCallback): () => void {
-    this.updateCallbacks.push(callback);
-    return () => {
-      this.updateCallbacks = this.updateCallbacks.filter(cb => cb !== callback);
-    };
-  }
+class StudentMonitoringClient {
+  private socket: Socket | null = null;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private heartbeatSeq = 0;
+  private attemptId = '';
+  private assessmentId = '';
+  private questionIndex = 0;
+  private isFullscreen = true;
+  private isOnline = true;
+  private instructionCallbacks: InstructionCallback[] = [];
 
-  // Subscribe to session updates
-  onSessionUpdate(callback: SessionCallback): () => void {
-    this.sessionCallbacks.push(callback);
-    return () => {
-      this.sessionCallbacks = this.sessionCallbacks.filter(cb => cb !== callback);
-    };
-  }
+  /** Connect to the /proctoring namespace and join a session */
+  connect(payload: StudentJoinPayload): void {
+    if (this.socket?.connected) return;
 
-  // Emit update to all subscribers
-  private emitUpdate(update: LiveUpdate) {
-    this.updateCallbacks.forEach(cb => cb(update));
-  }
+    this.attemptId = payload.attemptId;
+    this.assessmentId = payload.assessmentId;
 
-  // Emit session update to all subscribers
-  private emitSessionUpdate() {
-    const sessions = Array.from(this.activeSessions.values());
-    this.sessionCallbacks.forEach(cb => cb(sessions));
-  }
+    this.socket = io(`${getBaseUrl()}/proctoring`, {
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
 
-  // Add or update an active session
-  updateSession(session: ActiveSession) {
-    this.activeSessions.set(session.id, session);
-    this.emitSessionUpdate();
-    
-    // Emit update notification
-    this.emitUpdate({
-      type: 'status_change',
-      assessmentId: session.assessmentId,
-      studentId: session.studentId,
-      studentName: session.studentName,
-      data: { status: session.status },
-      timestamp: new Date().toISOString(),
+    this.socket.on('connect', () => {
+      console.log('[ws/student] connected');
+      this.socket!.emit('student:join', payload);
+      this.startHeartbeat();
+    });
+
+    this.socket.on('instruction', (instruction: InstructionPayload) => {
+      // Acknowledge receipt
+      this.socket!.emit('instruction:ack', {
+        instructionId: instruction.id,
+        timestamp: Date.now(),
+      });
+      // Notify listeners
+      for (const cb of this.instructionCallbacks) {
+        cb(instruction);
+      }
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('[ws/student] disconnected:', reason);
+      this.stopHeartbeat();
+    });
+
+    this.socket.on('connect_error', (err) => {
+      console.error('[ws/student] connection error:', err.message);
     });
   }
 
-  // Remove an active session
-  removeSession(sessionId: string) {
-    const session = this.activeSessions.get(sessionId);
-    if (session) {
-      this.activeSessions.delete(sessionId);
-      this.emitSessionUpdate();
-      
-      this.emitUpdate({
-        type: 'completion',
-        assessmentId: session.assessmentId,
-        studentId: session.studentId,
-        studentName: session.studentName,
-        data: { completed: true },
-        timestamp: new Date().toISOString(),
+  /** Disconnect from proctoring */
+  disconnect(reason: 'submit' | 'timeout' | 'disconnect' = 'disconnect'): void {
+    this.stopHeartbeat();
+    if (this.socket) {
+      this.socket.emit('student:leave', {
+        attemptId: this.attemptId,
+        assessmentId: this.assessmentId,
+        reason,
       });
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.heartbeatSeq = 0;
+  }
+
+  /** Report a violation to the server */
+  reportViolation(type: ViolationType, detail?: string): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit('student:violation', {
+      attemptId: this.attemptId,
+      assessmentId: this.assessmentId,
+      type,
+      detail,
+      timestamp: Date.now(),
+    });
+  }
+
+  /** Update local state for heartbeat data */
+  updateState(updates: { questionIndex?: number; isFullscreen?: boolean; isOnline?: boolean }): void {
+    if (updates.questionIndex !== undefined) this.questionIndex = updates.questionIndex;
+    if (updates.isFullscreen !== undefined) this.isFullscreen = updates.isFullscreen;
+    if (updates.isOnline !== undefined) this.isOnline = updates.isOnline;
+  }
+
+  /** Subscribe to instructions from the server */
+  onInstruction(callback: InstructionCallback): () => void {
+    this.instructionCallbacks.push(callback);
+    return () => {
+      this.instructionCallbacks = this.instructionCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /** Check if connected */
+  getIsConnected(): boolean {
+    return this.socket?.connected ?? false;
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    // Send heartbeat every 10 seconds
+    this.heartbeatInterval = setInterval(() => {
+      if (!this.socket?.connected) return;
+      this.heartbeatSeq++;
+      const payload: HeartbeatPayload = {
+        attemptId: this.attemptId,
+        assessmentId: this.assessmentId,
+        seq: this.heartbeatSeq,
+        timestamp: Date.now(),
+        questionIndex: this.questionIndex,
+        isFullscreen: this.isFullscreen,
+        isOnline: this.isOnline,
+      };
+      this.socket.emit('student:heartbeat', payload);
+    }, 10_000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+}
+
+// ── Admin Client ────────────────────────────────────────────────────────
+
+class AdminMonitoringClient {
+  private socket: Socket | null = null;
+  private subscribedAssessments = new Set<string>();
+  private dashboardCallbacks: DashboardCallback[] = [];
+  private violationAlertCallbacks: ViolationAlertCallback[] = [];
+  private joinCallbacks: Array<(data: { assessmentId: string; session: MonitoringSessionState }) => void> = [];
+  private leaveCallbacks: Array<(data: { assessmentId: string; attemptId: string; reason: string }) => void> = [];
+
+  /** Connect to the /admin namespace */
+  connect(): void {
+    if (this.socket?.connected) return;
+
+    this.socket = io(`${getBaseUrl()}/admin`, {
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    });
+
+    this.socket.on('connect', () => {
+      console.log('[ws/admin] connected');
+      // Re-subscribe to assessments if reconnecting
+      for (const assessmentId of this.subscribedAssessments) {
+        this.socket!.emit('monitor:subscribe', { assessmentId });
+      }
+    });
+
+    this.socket.on('monitor:update', (update: MonitoringDashboardUpdate) => {
+      for (const cb of this.dashboardCallbacks) cb(update);
+    });
+
+    this.socket.on('monitor:violation', (data: any) => {
+      for (const cb of this.violationAlertCallbacks) cb(data);
+    });
+
+    this.socket.on('monitor:join', (data: any) => {
+      for (const cb of this.joinCallbacks) cb(data);
+    });
+
+    this.socket.on('monitor:leave', (data: any) => {
+      for (const cb of this.leaveCallbacks) cb(data);
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('[ws/admin] disconnected:', reason);
+    });
+  }
+
+  /** Disconnect from admin monitoring */
+  disconnect(): void {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.subscribedAssessments.clear();
+  }
+
+  /** Subscribe to live updates for an assessment */
+  subscribe(assessmentId: string): void {
+    this.subscribedAssessments.add(assessmentId);
+    if (this.socket?.connected) {
+      this.socket.emit('monitor:subscribe', { assessmentId });
     }
   }
 
-  // Get all active sessions
+  /** Unsubscribe from an assessment */
+  unsubscribe(assessmentId: string): void {
+    this.subscribedAssessments.delete(assessmentId);
+    if (this.socket?.connected) {
+      this.socket.emit('monitor:unsubscribe', { assessmentId });
+    }
+  }
+
+  /** Send an instruction to a student */
+  sendInstruction(attemptId: string, type: InstructionPayload['type'], message: string): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit('instruction:send', {
+      attemptId,
+      instruction: { type, message },
+    });
+  }
+
+  /** Subscribe to dashboard updates */
+  onDashboardUpdate(callback: DashboardCallback): () => void {
+    this.dashboardCallbacks.push(callback);
+    return () => { this.dashboardCallbacks = this.dashboardCallbacks.filter(cb => cb !== callback); };
+  }
+
+  /** Subscribe to violation alerts */
+  onViolationAlert(callback: ViolationAlertCallback): () => void {
+    this.violationAlertCallbacks.push(callback);
+    return () => { this.violationAlertCallbacks = this.violationAlertCallbacks.filter(cb => cb !== callback); };
+  }
+
+  /** Subscribe to student join events */
+  onStudentJoin(callback: (data: { assessmentId: string; session: MonitoringSessionState }) => void): () => void {
+    this.joinCallbacks.push(callback);
+    return () => { this.joinCallbacks = this.joinCallbacks.filter(cb => cb !== callback); };
+  }
+
+  /** Subscribe to student leave events */
+  onStudentLeave(callback: (data: { assessmentId: string; attemptId: string; reason: string }) => void): () => void {
+    this.leaveCallbacks.push(callback);
+    return () => { this.leaveCallbacks = this.leaveCallbacks.filter(cb => cb !== callback); };
+  }
+
+  /** Check if connected */
+  getIsConnected(): boolean {
+    return this.socket?.connected ?? false;
+  }
+}
+
+// ── Backward-compatible RealtimeService facade ──────────────────────────
+
+/**
+ * Legacy facade that wraps both StudentMonitoringClient and AdminMonitoringClient.
+ * Preserves the existing API used by `useRealtimeUpdates` and `AdminContext`.
+ */
+class RealtimeService {
+  readonly student = new StudentMonitoringClient();
+  readonly admin = new AdminMonitoringClient();
+
+  private updateCallbacks: UpdateCallback[] = [];
+  private sessionCallbacks: SessionCallback[] = [];
+  private activeSessions: Map<string, ActiveSession> = new Map();
+  private isConnected = false;
+
+  /** Connect admin monitoring (for backward compatibility) */
+  connect(): void {
+    if (this.isConnected) return;
+    this.isConnected = true;
+    this.admin.connect();
+
+    // Wire admin dashboard updates to legacy ActiveSession format
+    this.admin.onDashboardUpdate((update) => {
+      this.syncSessionsFromDashboard(update);
+    });
+  }
+
+  /** Disconnect all clients */
+  disconnect(): void {
+    if (!this.isConnected) return;
+    this.isConnected = false;
+    this.admin.disconnect();
+    this.student.disconnect();
+  }
+
+  /** Subscribe to LiveUpdate events (legacy) */
+  onUpdate(callback: UpdateCallback): () => void {
+    this.updateCallbacks.push(callback);
+    return () => { this.updateCallbacks = this.updateCallbacks.filter(cb => cb !== callback); };
+  }
+
+  /** Subscribe to session list changes (legacy) */
+  onSessionUpdate(callback: SessionCallback): () => void {
+    this.sessionCallbacks.push(callback);
+    return () => { this.sessionCallbacks = this.sessionCallbacks.filter(cb => cb !== callback); };
+  }
+
+  /** Get all active sessions (legacy) */
   getActiveSessions(): ActiveSession[] {
     return Array.from(this.activeSessions.values());
   }
 
-  // Get sessions for a specific assessment
+  /** Get sessions for a specific assessment (legacy) */
   getAssessmentSessions(assessmentId: string): ActiveSession[] {
     return Array.from(this.activeSessions.values())
       .filter(s => s.assessmentId === assessmentId);
   }
 
-  // Simulate real-time updates (for demo purposes)
-  private simulateUpdates() {
-    if (!this.isConnected) return;
-    
-    // Randomly update existing sessions
-    this.activeSessions.forEach((session, id) => {
-      const random = Math.random();
-      
-      // 20% chance of activity update
-      if (random < 0.2) {
-        const updatedSession = {
-          ...session,
-          lastActivity: new Date().toISOString(),
-        };
-        
-        // 10% chance of submission
-        if (random < 0.1 && session.submittedQuestions < session.totalQuestions) {
-          updatedSession.submittedQuestions += 1;
-          updatedSession.currentQuestion = Math.min(
-            session.currentQuestion + 1,
-            session.totalQuestions
-          );
-          
-          this.emitUpdate({
-            type: 'submission',
-            assessmentId: session.assessmentId,
-            studentId: session.studentId,
-            studentName: session.studentName,
-            data: {
-              questionIndex: session.currentQuestion,
-              submitted: updatedSession.submittedQuestions,
-              total: session.totalQuestions,
-            },
-            timestamp: new Date().toISOString(),
-          });
-        }
-        
-        // 5% chance of tab switch (suspicious activity)
-        if (random < 0.05) {
-          updatedSession.tabSwitches += 1;
-          if (updatedSession.tabSwitches >= 3) {
-            updatedSession.status = 'suspicious';
-          }
-        }
-        
-        // 3% chance of completion
-        if (random < 0.03 && session.submittedQuestions === session.totalQuestions) {
-          updatedSession.status = 'completed';
-          this.removeSession(id);
-          return;
-        }
-        
-        this.activeSessions.set(id, updatedSession);
-      }
-    });
-    
-    this.emitSessionUpdate();
-  }
-
-  // Start a new session (called when student starts assessment)
-  startSession(
-    assessmentId: string,
-    studentId: string,
-    studentName: string,
-    avatar: string,
-    totalQuestions: number,
-    ipAddress: string = '192.168.1.' + Math.floor(Math.random() * 255)
-  ): ActiveSession {
-    const session: ActiveSession = {
-      id: `session-${Date.now()}-${studentId}`,
-      assessmentId,
-      studentId,
-      studentName,
-      avatar,
-      startedAt: new Date().toISOString(),
-      currentQuestion: 1,
-      totalQuestions,
-      submittedQuestions: 0,
-      status: 'active',
-      lastActivity: new Date().toISOString(),
-      ipAddress,
-      tabSwitches: 0,
-      copyPasteCount: 0,
-    };
-    
-    this.activeSessions.set(session.id, session);
-    
-    this.emitUpdate({
-      type: 'new_student',
-      assessmentId,
-      studentId,
-      studentName,
-      data: { session },
-      timestamp: new Date().toISOString(),
-    });
-    
-    this.emitSessionUpdate();
-    
-    return session;
-  }
-
-  // Record suspicious activity
-  recordSuspiciousActivity(
-    sessionId: string,
-    type: 'tab_switch' | 'copy_paste' | 'idle'
-  ) {
-    const session = this.activeSessions.get(sessionId);
-    if (!session) return;
-    
-    const updatedSession = { ...session };
-    
-    switch (type) {
-      case 'tab_switch':
-        updatedSession.tabSwitches += 1;
-        break;
-      case 'copy_paste':
-        updatedSession.copyPasteCount += 1;
-        break;
-      case 'idle':
-        updatedSession.status = 'idle';
-        break;
-    }
-    
-    // Mark as suspicious if threshold exceeded
-    if (updatedSession.tabSwitches >= 3 || updatedSession.copyPasteCount >= 5) {
-      updatedSession.status = 'suspicious';
-    }
-    
-    this.activeSessions.set(sessionId, updatedSession);
-    this.emitSessionUpdate();
-  }
-
-  // Get connection status
+  /** Check connection state */
   isActive(): boolean {
     return this.isConnected;
   }
+
+  // ── Private ──────────────────────────────────────────────────
+
+  private syncSessionsFromDashboard(update: MonitoringDashboardUpdate): void {
+    // Convert MonitoringSessionState → ActiveSession
+    for (const ws of update.sessions) {
+      const legacy: ActiveSession = {
+        id: ws.attemptId,
+        assessmentId: ws.assessmentId,
+        studentId: ws.studentId,
+        studentName: ws.studentName,
+        avatar: '',
+        startedAt: ws.joinedAt,
+        currentQuestion: ws.questionIndex + 1,
+        totalQuestions: 0, // not tracked server-side
+        submittedQuestions: 0,
+        status: ws.status === 'flagged' || ws.status === 'suspicious'
+          ? 'suspicious'
+          : ws.status === 'disconnected'
+            ? 'completed'
+            : ws.status === 'idle' ? 'idle' : 'active',
+        lastActivity: ws.lastHeartbeat,
+        ipAddress: '',
+        tabSwitches: ws.violations.tabSwitches,
+        copyPasteCount: ws.violations.pasteCount,
+      };
+      this.activeSessions.set(ws.attemptId, legacy);
+    }
+
+    this.emitSessionUpdate();
+  }
+
+  private emitSessionUpdate(): void {
+    const sessions = Array.from(this.activeSessions.values());
+    for (const cb of this.sessionCallbacks) cb(sessions);
+  }
 }
 
-// Singleton instance
+// ── Singleton exports ───────────────────────────────────────────────────
+
 export const realtimeService = new RealtimeService();
 
-// Hook for React components
+/**
+ * Hook-like helper for components (non-reactive — for React hooks, wrap in context).
+ */
 export const useRealtimeUpdates = (
   assessmentId?: string,
-  onUpdate?: UpdateCallback
+  _onUpdate?: UpdateCallback
 ): {
   isConnected: boolean;
   sessions: ActiveSession[];
   connect: () => void;
   disconnect: () => void;
 } => {
-  // This would be a proper React hook in the actual implementation
-  // For now, return the service methods
   return {
     isConnected: realtimeService.isActive(),
-    sessions: assessmentId 
+    sessions: assessmentId
       ? realtimeService.getAssessmentSessions(assessmentId)
       : realtimeService.getActiveSessions(),
     connect: () => realtimeService.connect(),

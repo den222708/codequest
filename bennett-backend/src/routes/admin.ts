@@ -3,9 +3,13 @@ import { z } from "zod";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { notifyAccountCreated } from "../services/notificationService.js";
+import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser, AppRole } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
 import crypto from "node:crypto";
+
+const log = createChildLogger({ module: "admin" });
 
 const admin = new Hono<AppEnv>();
 admin.use("*", authMiddleware);
@@ -92,7 +96,10 @@ admin.post("/users", async (c) => {
     action: "admin_create_user",
     details: { createdUserId: data.user.id, role: d.role, email: d.email },
     ip_address: c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
-  }).then(({ error: logErr }) => { if (logErr) console.error("activity_log insert failed:", logErr.message); });
+  }).then(({ error: logErr }) => { if (logErr) log.error({ err: logErr }, "activity_log insert failed"); });
+
+  // Welcome notification (fire-and-forget)
+  notifyAccountCreated(data.user.id, d.role);
 
   return sendSuccess(c, {
     userId: data.user.id,
@@ -167,6 +174,9 @@ admin.post("/users/bulk", async (c) => {
       userId: data.user.id,
       password,
     });
+
+    // Welcome notification (fire-and-forget)
+    notifyAccountCreated(data.user.id, u.role);
   }
 
   // Log bulk action
@@ -175,7 +185,7 @@ admin.post("/users/bulk", async (c) => {
     action: "admin_bulk_create_users",
     details: { totalRequested: parsed.data.users.length, created: created.length, failed: failed.length },
     ip_address: c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown",
-  }).then(({ error: logErr }) => { if (logErr) console.error("activity_log insert failed:", logErr.message); });
+  }).then(({ error: logErr }) => { if (logErr) log.error({ err: logErr }, "activity_log insert failed"); });
 
   return sendSuccess(c, { created, failed, summary: { total: parsed.data.users.length, created: created.length, failed: failed.length } }, 201);
 });

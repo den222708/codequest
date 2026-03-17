@@ -2,7 +2,6 @@ import React from 'react';
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import ProtectedRoute from './ProtectedRoute';
-import RoleBasedRoute from './RoleBasedRoute';
 import Layout from '../components/Layout';
 
 // Public Screens
@@ -139,7 +138,7 @@ const DemoEntryPage: React.FC = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
       <div className="max-w-md w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xl">
         <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-lg font-black tracking-wide">
-          DQ
+          CQ
         </div>
         <h2 className="text-2xl font-bold mb-2">CodeQuest Demo</h2>
         <p className="text-slate-600 mb-5">{status}</p>
@@ -259,7 +258,7 @@ const AppRoutes: React.FC = () => {
           ? '/student/dashboard'
           : currentUser?.role === 'professor'
             ? '/professor/dashboard'
-            : '/admin/dashboard'
+            : '/admin/courses'
       }
       replace
     />
@@ -282,7 +281,7 @@ const AppRoutes: React.FC = () => {
                   ? '/student/dashboard'
                   : currentUser?.role === 'professor'
                     ? '/professor/dashboard'
-                    : '/admin/dashboard'
+                    : '/admin/courses'
               }
               replace
             />
@@ -303,7 +302,7 @@ const AppRoutes: React.FC = () => {
                   ? '/student/dashboard'
                   : currentUser?.role === 'professor'
                     ? '/professor/dashboard'
-                    : '/admin/dashboard'
+                    : '/admin/courses'
               }
               replace
             />
@@ -538,6 +537,7 @@ const AppRoutes: React.FC = () => {
                     <CreateQuestion
                       onBack={() => {
                         setEditingQuestion(null);
+                        navigate('/professor/questions');
                       }}
                       onSave={addQuestion}
                       editingQuestion={editingQuestion}

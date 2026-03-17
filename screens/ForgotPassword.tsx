@@ -7,19 +7,26 @@ const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+    setNetworkError(false);
+
     try {
       await authService.forgotPassword(email);
-    } catch {
-      // Silently proceed — backend always returns success for security
+      setSent(true);
+    } catch (err: any) {
+      if (err?.message === 'Network Error' || err?.name === 'TypeError') {
+        setNetworkError(true);
+      } else {
+        // Backend returns success for security even if email not found
+        setSent(true);
+      }
     }
-    
+
     setLoading(false);
-    setSent(true);
   };
 
   return (
@@ -45,6 +52,12 @@ const ForgotPassword: React.FC = () => {
                   No worries! Enter your email and we'll send you reset instructions.
                 </p>
               </div>
+
+              {networkError && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+                  Unable to connect. Please check your internet connection and try again.
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>

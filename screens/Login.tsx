@@ -35,13 +35,7 @@ const Login: React.FC = () => {
 
     try {
       const success = await login(email, password);
-      if (success) {
-        const dashboardPath =
-          currentUser?.role === 'student' ? '/student/dashboard' :
-            currentUser?.role === 'professor' ? '/professor/dashboard' :
-              '/admin/dashboard';
-        navigate(dashboardPath, { replace: true });
-      } else {
+      if (!success) {
         setError('Invalid email or password. Please try again.');
       }
     } catch (err) {

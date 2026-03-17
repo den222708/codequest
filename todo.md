@@ -1,77 +1,153 @@
-# TODO (CodeQuest) – 2026-02-09
+# TODO (CodeQuest) — Updated 2026-03-14
 
-## Auth & Security
-- ✅ Replace plaintext passwords with hashed storage (bcrypt) in creation/seed and updates.
-- ✅ Add JWT auth endpoints (login/signup/refresh/forgot/reset) and auth middleware; still need session timeout & persistent lockout + refresh persistence/blacklist (currently in-memory).
-- ✅ Wire role-based guards on API routes; align role/status enums across frontend/backend remains.
-- ✅ Enforce basic password complexity via zod validation.
-- ✅ Add logout endpoint that revokes current refresh jti.
+## Completed
 
-## Backend Data & API
-- ✅ Parse/return JSON fields (settings/tags/boilerplateCode/includes/results) for reads; normalize enums to lowercase on responses.
-- ✅ Fix BigInt serialization for backups; standardize backup size units. (serialization done; units still TODO)
-- ✅ Add clone endpoint and attempt creation for assessments; still need status enums and question type scaffolding (MCQ/short/TF/file upload).
-- ✅ Implement request validation + envelope on auth/users/questions/assessments/submissions/execute/analytics/system; remaining: roles/status alignments, backup size units.
-- ✅ Update CORS to include Vite dev origin (5173) + env override.
-- ✅ Add helmet, global rate limit, and auth-specific rate limit.
+### Auth & Security
+- [x] Replace plaintext passwords with hashed storage (bcrypt)
+- [x] JWT auth endpoints (login/signup/refresh/forgot/reset) + middleware
+- [x] Role-based guards on API routes; 3-role model (student/teacher/admin)
+- [x] Password complexity via Zod (8+ chars, uppercase, lowercase, digit, special char)
+- [x] Logout endpoint with token blacklisting (persistent in DB)
+- [x] Account lockout after 5 failed login attempts (15-min lockout)
+- [x] Session inactivity timeout (30 minutes, server-enforced)
+- [x] Concurrent session limit (max 2 per user)
+- [x] Password history (cannot reuse last 5 passwords)
+- [x] Password expiry (90-day enforcement in auth middleware)
+- [x] Password change endpoint (POST /auth/change-password)
+- [x] CORS env-configurable; localhost-only fallback in dev
+- [x] Helmet, global rate limit, auth-specific rate limit
+- [x] .gitignore covers **/.env and .env.*
+- [x] Rate limits read from env vars (RATE_LIMIT_GLOBAL, RATE_LIMIT_AUTH, RATE_LIMIT_EXECUTE)
+- [x] Auth rate limiting on login/signup/forgot-password endpoints
 
-## Execution, Plagiarism, Realtime
-- Integrate real code executor (Judge0/Piston) with limits & queue; remove random scoring.
-- Add plagiarism pipeline + endpoints; hook to submissions.
-- Add WebSocket layer for live monitor/proctor events.
+### Backend Data & API
+- [x] JSON field parsing/normalization on all reads
+- [x] Response envelope ({success, data, error, timestamp}) on all endpoints
+- [x] Zod validation on all route inputs
+- [x] Assessment clone, attempt creation, publish-via-update
+- [x] Backup CRUD endpoints (POST/DELETE /system/backups)
+- [x] Plagiarism review endpoint (PUT /system/plagiarism/:id/review)
+- [x] Notification CRUD endpoints (GET/PUT/DELETE /notifications)
+- [x] System health endpoint (GET /system/health) with real DB + memory metrics
+- [x] System stats endpoint (GET /system/stats)
+- [x] Activity logs endpoint (GET /system/logs)
 
-## Frontend Integration
-- Replace mock AppContext data with API client; move login/signup to backend; persist sessions.
-- Normalize role/status casing; handle JSON fields; apply response envelope handling.
-- Apply design tokens/a11y checklist globally; add focus/aria improvements.
+### Code Execution
+- [x] Programiz WebSocket proxy (primary executor, no API key needed)
+- [x] Judge0 fallback for unsupported languages
+- [x] Stdin injection per language (Python, C++, C, Java, JavaScript)
+- [x] Test runner with strict output matching
 
-## DevOps & Observability
-- Move DB to Postgres + migrations; remove committed secrets; env handling.
-- Add structured logging, error tracking, health metrics; email service for notifications.
+### Frontend
+- [x] All services wired to backend API (auth, assessments, questions, submissions, execute)
+- [x] Role/status enum alignment (frontend professor = backend teacher)
+- [x] subadmin/superadmin removed from frontend (3-role model)
+- [x] System health wired to real /system/health endpoint
+- [x] Plagiarism service: removed fake delay, local comparison functional
 
-## Quick wins (start here)
-- ✅ Fix CORS origin, BigInt backup response, JSON parsing, enum casing consistency.
-- ✅ Add minimal auth hashing + tokens (login/signup/refresh). Middleware exists; still need forgot/reset + guards.
+### Database & Migrations
+- [x] Supabase (Postgres) with full migration SQL
+- [x] RLS policies on all tables
+- [x] token_blacklist, active_sessions, backups, plagiarism_results tables
+- [x] notifications table + RLS
+- [x] password_history table + profile password_changed_at column
+- [x] Assessment monitoring_mode column ('standard' | 'proctored')
+- [x] monitoring_events table + RLS (Phase 6)
 
----
+### Foundation & Cleanup (Phase 0 — 2026-03-14)
+- [x] Deleted dead `data/mockData.ts` (1197 lines, zero imports)
+- [x] Split `bennett-backend/src/index.ts` into `app.ts` + `index.ts` (testable app export)
+- [x] Fixed hardcoded rate limits → env var driven (RATE_LIMITS constant object)
+- [x] Added auth rate limiting to login/signup/forgot-password
+- [x] Untracked `.env.production` from git
+- [x] Updated `tsconfig.json` exclude (removed stale `backend` reference)
+- [x] Installed Vitest + testing libraries (frontend: RTL, jsdom, msw; backend: vitest)
+- [x] Created vitest configs and test scripts for both projects
+- [x] Created `to-delete.md` for locked backend/ directory
 
-# Update Log – 2026-02-18
+### AppContext Split (Phase 1 — 2026-03-14)
+- [x] Split AppContext (916 lines) into 7 domain contexts (Auth, Assessment, Question, Submission, Notification, Admin, UI)
+- [x] Bridge migration pattern: AppContext re-exports merged interface via useApp()
+- [x] ContextWiring component wires cross-context refs (login callbacks, data refs)
+- [x] Zero consumer changes needed — backward-compatible
 
-## Demo Mode + Assessment Flow
-- ✅ Fixed demo bootstrap race and stuck loader behavior by making `startDemoMode()` idempotent (promise-guarded).
-- ✅ Updated `/demo` loading flow to run bootstrap + progress animation together with timeout protection.
-- ✅ Switched demo auth reset to direct token clear (no logout API dependency during demo bootstrap).
-- ✅ Added explicit empty-state handling in editor when question payload is missing (no fake fallback problem data).
-- ✅ Auto-collapse problem sidebar when assessment starts.
+### Programiz Proxy Hardening (Phase 2 — 2026-03-14)
+- [x] Circuit breaker with 3 health states (GOOD/DEGRADED/BAD), SEB TransmissionSpooler-inspired
+- [x] ConcurrencyLimiter semaphore (default 6 connections)
+- [x] Endpoint pool rotation + retry with exponential backoff
+- [x] Judge0 Docker executor + admin toggle (GET/PUT /system/execution-backend)
+- [x] ExecutionDispatcher routing layer (all routes import from dispatcher)
 
-## Secure Fullscreen / Proctoring UX
-- ✅ Added secure-mode grace window + in-progress fullscreen request guard to avoid false immediate violations.
-- ✅ Added small transition delay after entering fullscreen from instructions before moving to editor.
+### Testing Infrastructure (Phase 3 — 2026-03-14)
+- [x] Backend: 65 tests across 7 files (circuitBreaker, fingerprint, languages, cache, rateLimit, executionDispatcher, judge0Executor)
+- [x] Frontend: 66 tests across 5 files (UIContext, NotificationContext, draftService, apiClient, types/ROLE_PERMISSIONS)
+- [x] Total: 131 tests, all passing
+- [x] Fixed NotificationContext.test.tsx Date.now() ID collision bug
 
-## Real Code Execution (Judge0) – No Fake Results
-- ✅ Replaced legacy simulated executor path in `backend/src/routes/execute.ts` with Judge0-only execution.
-- ✅ Removed simulator fallback from backend provider flow (self-host / rapidapi / auto only).
-- ✅ Removed frontend demo fallback result generation from editor run/submit paths.
-- ✅ Removed randomized score/status backfill in `backend/src/routes/submissions.ts`.
-- ✅ Deleted legacy simulated frontend service `services/codeExecutionService.ts` and export wiring.
+### Notifications Full Stack Wiring (Phase 4 — 2026-03-14)
+- [x] Created notificationService.ts with fire-and-forget helpers (create, bulk, assessmentPublished, submissionGraded, attemptCompleted, accountCreated, notifyAdmins)
+- [x] Backend triggers: assessments (publish), submissions (graded + attempt complete), admin (user create), system (backup create)
+- [x] Expanded Notification type to include assessment/submission/system
+- [x] Updated Notifications screen with icons/colors for new types
+- [x] Rewrote NotificationContext — hybrid client+server, 30s polling, maps isRead→read, optimistic updates
+- [x] Fixed provider order (NotificationProvider inside AuthProvider)
+- [x] Added unreadCount, deleteNotification, refreshNotifications to bridge interface
+- [x] Total: 132 tests, all green
 
-## Execution Output Fidelity (Compiler/Runtime Diagnostics)
-- ✅ Extended execute API payload to include real Judge0 fields:
-  - `stdout`, `stderr`, `compileOutput`, `message`
-  - `status { id, description }`, `token`, `exitCode`, `exitSignal`
-  - `executionTime`, `wallTime`, `memoryUsed`
-- ✅ Extended run-tests payload to return per-test rich diagnostics (`status`, `token`, `stderr`, `compileOutput`, `message`, timings, memory).
-- ✅ Tightened testcase comparison to strict output matching (newline normalization only; no contains/loose match).
-- ✅ Updated frontend console + test-result UI to render separate formatted sections for stdout/stderr/compile output/message.
+### Server-Side Plagiarism Detection (Phase 5 — 2026-03-14)
+- [x] Created winnowing algorithm service (plagiarismDetector.ts) — MOSS paper implementation
+- [x] Pipeline: comment/string strip → identifier normalization → k-gram rolling hash → winnowing → pairwise comparison
+- [x] Added POST /system/plagiarism/scan/:assessmentId and GET /system/plagiarism/:assessmentId endpoints
+- [x] Added submission_id, question_id columns + RLS policies to plagiarism_results table
+- [x] Rewrote frontend plagiarismService.ts — thin API client replacing 289-line client-side Jaccard engine
+- [x] Wired AdminContext with scanPlagiarism, loadPlagiarismResults, plagiarismSummary, plagiarismScanning
+- [x] Updated AppContext bridge with new plagiarism functions
+- [x] 34 tests for plagiarism detector (all passing)
+- [x] Total: 166 tests, all green
 
-## Verified Today
-- ✅ Frontend build passes (`npm run build`).
-- ✅ Backend build passes (`npm run build` in `backend/`).
-- ✅ Provider endpoint confirms active self-host Judge0.
-- ✅ Runtime errors return real traceback with line numbers.
-- ✅ Compilation errors return real compiler diagnostics (Java/C++ line+caret output).
-- ✅ Wrong solutions (e.g., `print("Hello World")`) correctly fail unrelated testcases.
-- ✅ Strict output check verified (`"1, 2"` vs `"1,2"` now fails).
+### WebSocket Real-Time Monitoring & Proctoring (Phase 6 — 2026-03-14)
+- [x] Created monitoringTypes.ts — comprehensive shared types (client/server/admin event maps, ViolationType, MonitoringSessionState, MonitoringEventRow)
+- [x] Created socketServer.ts — Socket.IO server with /proctoring (student) and /admin (teacher/admin) namespaces
+- [x] SEB-inspired patterns: heartbeat with sequential counter + gap detection, instruction queue + ack, event batch persistence every 5s, auto-warn at 3 violations, disconnected session 5-min retention
+- [x] Updated index.ts — node:http createServer + getRequestListener for Hono/Socket.IO coexistence on same port
+- [x] Extracted CORS_ORIGINS constant from app.ts (shared between Hono CORS and Socket.IO)
+- [x] Added monitoring_events table to migration.sql (6 event types, 4 indexes, RLS for teacher/admin/student)
+- [x] Created monitoringService.ts (frontend) — SEB-inspired client-side detector: visibilitychange, paste, copy/cut, fullscreen, offline/online, blur, devtools heuristic
+- [x] Rewrote realtimeService.ts — Socket.IO client with StudentMonitoringClient (/proctoring) and AdminMonitoringClient (/admin), backward-compatible RealtimeService facade
+- [x] Added 4 monitoring REST endpoints: GET events (paginated), POST events (standard mode fallback), GET sessions (live), GET summary (aggregated)
+- [x] 14 backend tests (monitoringTypes contracts, socketServer helpers, event row structure)
+- [x] 17 frontend tests (monitoring lifecycle, violation detection, listener cleanup, ViolationType coverage)
+- [x] Total: 197 tests, all green
+
+### Backend Hardening & Observability (Phase 7 — 2026-03-14)
+- [x] Created Pino structured logger (logger.ts) — env-aware config (JSON prod, pretty dev), ISO timestamps, createChildLogger factory
+- [x] Created Sentry integration (sentry.ts) — only active when SENTRY_DSN set, suppresses non-production, captureException/captureMessage wrappers
+- [x] Created cleanup jobs (cleanupJobs.ts) — purgeExpiredTokens, purgeStaleActiveSessions, purgeOldMonitoringEvents, configurable intervals via env vars
+- [x] Replaced all 28 console.* calls with Pino logger across 10 files (index.ts, app.ts, socketServer.ts, executionDispatcher.ts, circuitBreaker.ts, notificationService.ts, auth.ts, admin.ts, system.ts, auth middleware)
+- [x] Added RLS policies for backups table (admin-only SELECT/INSERT/UPDATE/DELETE)
+- [x] Wired Sentry + cleanup jobs + graceful shutdown into index.ts (SIGTERM/SIGINT handlers)
+- [x] Updated .env.example with all new env vars (LOG_LEVEL, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE, APP_VERSION, CLEANUP_INTERVAL_MINUTES, TOKEN_MAX_AGE_HOURS, SESSION_STALE_HOURS, MONITORING_RETENTION_DAYS, FRONTEND_URL)
+- [x] 7 logger tests + 10 cleanupJobs tests (all passing)
+- [x] Total: 214 tests (130 backend across 11 files + 84 frontend across 6 files), all green
+
+## Remaining — Master Improvement Plan
+
+### Phase 7: Backend Hardening & Observability (COMPLETE)
+- [x] Pino structured logging (replace console.log/error)
+- [x] Sentry error tracking (frontend + backend)
+- [x] Cleanup jobs for expired token_blacklist and stale active_sessions
+- [x] RLS policies for backups table (plagiarism_results RLS done in Phase 5)
+
+### Phase 8: Frontend Polish (MEDIUM)
+- [ ] MFA (optional TOTP via Supabase Auth MFA)
+- [ ] Question types beyond code (MCQ, short-answer, true/false, file upload)
+- [ ] Proctoring UI components
+- [ ] Analytics CSV/PDF export
+
+### Phase 9: Accessibility & Documentation (LOW)
+- [ ] WCAG 2.1 AA audit (aria labels, focus rings, skip-link, design tokens)
+- [ ] OpenAPI spec generation
+- [ ] Updated README with architecture diagrams
 
 ## Judge0 Docker Setup (Self-Host)
 1. Install Docker Desktop and make sure Docker is running.
@@ -83,15 +159,9 @@
    - `docker compose up -d`
 4. Wait until containers are healthy, then verify Judge0 API:
    - `curl http://localhost:2358/languages`
-5. Configure this project backend (`backend/.env`):
+5. Configure this project backend (`bennett-backend/.env`):
    - `EXECUTOR_PROVIDER=self-host`
    - `JUDGE0_BASE_URL=http://localhost:2358`
    - `JUDGE0_AUTH_TOKEN=` (set only if your Judge0 instance requires it)
 6. Restart backend and verify project integration:
    - `curl http://localhost:3001/api/v1/execute/provider`
-   - `curl -X POST http://localhost:3001/api/v1/execute -H "Content-Type: application/json" -d "{\"code\":\"print('ok')\",\"language\":\"python\"}"`
-
-### Optional Ops Commands
-- Stop Judge0: `docker compose down`
-- Stop + remove volumes: `docker compose down -v`
-- View logs: `docker compose logs -f`

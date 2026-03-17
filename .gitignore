@@ -12,7 +12,9 @@ dist
 dist-ssr
 *.local
 .env
+.env.*
 **/.env
+**/.env.*
 backend/.env
 bennett-backend/.env
 backend/prisma/dev.db
@@ -35,9 +37,11 @@ backend/prisma/dev.db
 api-test
 
 
-plantofixclaude.md
-plantofixopencode.md
-FIX_PLAN.md
 fixes.md
 MASTER_FIX_PLAN.md
-TSC_REMAINING_FIX_PLAN.md
+md files/archive/
+
+# Data & misc
+student_data/
+to-delete.md
+.env.production

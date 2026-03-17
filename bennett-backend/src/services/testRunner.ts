@@ -1,4 +1,4 @@
-import { executeCode } from "./programizProxy.js";
+import { executeCode } from "./executionDispatcher.js";
 
 interface TestCase {
   input: string;

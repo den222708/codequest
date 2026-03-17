@@ -33,6 +33,7 @@ const Layout: React.FC<LayoutProps> = ({
   const profLinks = [
     { icon: 'dashboard', label: 'Dashboard', path: '/professor/dashboard' },
     { icon: 'assignment', label: 'Assessments', path: '/professor/assessments' },
+    { icon: 'help_outline', label: 'Questions', path: '/professor/questions' },
     { icon: 'cast_for_education', label: 'Live Monitor', path: '/professor/live-monitor' },
     { icon: 'analytics', label: 'Analytics', path: '/professor/analytics' },
     { icon: 'leaderboard', label: 'Leaderboard', path: '/professor/leaderboard' },
@@ -43,7 +44,13 @@ const Layout: React.FC<LayoutProps> = ({
   const adminLinks = [
     { icon: 'school', label: 'Courses', path: '/admin/courses' },
     { icon: 'group', label: 'User Management', path: '/admin/users' },
+    { icon: 'admin_panel_settings', label: 'Admins', path: '/admin/admins' },
     { icon: 'analytics', label: 'Analytics', path: '/admin/analytics' },
+    { icon: 'monitor_heart', label: 'System Health', path: '/admin/system-health' },
+    { icon: 'receipt_long', label: 'System Logs', path: '/admin/system-logs' },
+    { icon: 'backup', label: 'Backups', path: '/admin/backups' },
+    { icon: 'notifications', label: 'Notifications', path: '/admin/notifications' },
+    { icon: 'settings', label: 'Settings', path: '/admin/settings' },
   ];
 
   const getLinks = () => {

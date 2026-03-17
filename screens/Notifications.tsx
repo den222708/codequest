@@ -21,6 +21,9 @@ const Notifications: React.FC<Props> = ({ notifications, onMarkRead, onClearAll 
       case 'success': return 'check_circle';
       case 'error': return 'error';
       case 'warning': return 'warning';
+      case 'assessment': return 'assignment';
+      case 'submission': return 'grading';
+      case 'system': return 'settings';
       default: return 'info';
     }
   };
@@ -30,6 +33,9 @@ const Notifications: React.FC<Props> = ({ notifications, onMarkRead, onClearAll 
       case 'success': return 'text-green-500 bg-green-100 dark:bg-green-900/30';
       case 'error': return 'text-red-500 bg-red-100 dark:bg-red-900/30';
       case 'warning': return 'text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30';
+      case 'assessment': return 'text-purple-500 bg-purple-100 dark:bg-purple-900/30';
+      case 'submission': return 'text-teal-500 bg-teal-100 dark:bg-teal-900/30';
+      case 'system': return 'text-slate-500 bg-slate-100 dark:bg-slate-700/30';
       default: return 'text-blue-500 bg-blue-100 dark:bg-blue-900/30';
     }
   };

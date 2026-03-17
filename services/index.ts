@@ -1,7 +1,9 @@
 // Export all services
-export { default as plagiarismService, checkPlagiarism, batchCheckPlagiarism, reviewPlagiarismResult, getPlagiarismStats, generatePlagiarismReport } from './plagiarismService';
+export { default as plagiarismService, scanPlagiarism, getPlagiarismResults, reviewPlagiarismResult, getPlagiarismStats, generatePlagiarismReport } from './plagiarismService';
 export { default as exportService, exportAssessmentResultsCSV, exportUsersCSV, exportAnalyticsCSV, exportPlagiarismReportCSV, exportAssessmentResultsPDF, exportStudentResultPDF, exportLogsJSON, exportToJSON } from './exportService';
 export { default as realtimeService, useRealtimeUpdates } from './realtimeService';
+export { default as monitoringService } from './monitoringService';
+export type { ViolationType, ViolationHandler } from './monitoringService';
 export { draftService, timerService, bookmarkService } from './draftService';
 
 // Judge0 Code Execution Service

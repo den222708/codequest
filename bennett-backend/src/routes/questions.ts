@@ -10,10 +10,11 @@ import type { AppEnv } from "../lib/env.js";
 const questions = new Hono<AppEnv>();
 questions.use("*", authMiddleware);
 
-const questionSchema = z.object({
+const questionBaseSchema = z.object({
   title: z.string().min(3).max(200),
   description: z.string().min(10),
   difficulty: z.enum(["easy", "medium", "hard"]),
+  questionType: z.enum(["coding", "mcq", "short_answer", "true_false"]).default("coding"),
   topic: z.string().min(1),
   tags: z.array(z.string()).default([]),
   points: z.number().int().min(1).default(10),
@@ -29,7 +30,7 @@ const questionSchema = z.object({
         timeLimit: z.number().int().min(100).default(2000),
       })
     )
-    .min(1),
+    .default([]),
   boilerplateCode: z
     .object({
       python: z.string().optional(),
@@ -40,7 +41,35 @@ const questionSchema = z.object({
     .default({}),
   solution: z.string().optional(),
   hints: z.array(z.string()).default([]),
+  options: z
+    .array(
+      z.object({
+        id: z.string(),
+        text: z.string().min(1),
+        isCorrect: z.boolean(),
+      })
+    )
+    .nullable()
+    .default(null),
+  correctAnswer: z.string().nullable().default(null),
   isVisible: z.boolean().default(true),
+});
+
+const questionSchema = questionBaseSchema.refine((data) => {
+  if (data.questionType === "coding" && data.testCases.length < 1) return false;
+  if (data.questionType === "mcq") {
+    if (!data.options || data.options.length < 2) return false;
+    if (data.options.filter(o => o.isCorrect).length !== 1) return false;
+  }
+  if (data.questionType === "true_false") {
+    if (data.correctAnswer !== "true" && data.correctAnswer !== "false") return false;
+  }
+  if (data.questionType === "short_answer") {
+    if (!data.correctAnswer || data.correctAnswer.trim().length === 0) return false;
+  }
+  return true;
+}, {
+  message: "Invalid question data for the selected question type",
 });
 
 // ── GET /questions ────────────────────────────────────────────────────
@@ -127,6 +156,7 @@ questions.post("/", requireRole("teacher", "admin"), async (c) => {
       title: parsed.data.title,
       description: parsed.data.description,
       difficulty: parsed.data.difficulty,
+      question_type: parsed.data.questionType,
       topic: parsed.data.topic,
       tags: parsed.data.tags,
       points: parsed.data.points,
@@ -136,6 +166,8 @@ questions.post("/", requireRole("teacher", "admin"), async (c) => {
       boilerplate_code: parsed.data.boilerplateCode,
       solution: parsed.data.solution ?? null,
       hints: parsed.data.hints,
+      options: parsed.data.options,
+      correct_answer: parsed.data.correctAnswer,
       is_visible: parsed.data.isVisible,
       created_by: user.id,
     })
@@ -153,7 +185,7 @@ questions.put("/:id", requireRole("teacher", "admin"), async (c) => {
   const user = c.get("user") as AuthUser;
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
-  const parsed = questionSchema.partial().safeParse(body);
+  const parsed = questionBaseSchema.partial().safeParse(body);
   if (!parsed.success) return sendError(c, 400, parsed.error.errors[0].message);
 
   const supabase = getSupabaseAdmin();
@@ -171,6 +203,7 @@ questions.put("/:id", requireRole("teacher", "admin"), async (c) => {
   if (d.title) updates.title = d.title;
   if (d.description) updates.description = d.description;
   if (d.difficulty) updates.difficulty = d.difficulty;
+  if (d.questionType) updates.question_type = d.questionType;
   if (d.topic) updates.topic = d.topic;
   if (d.tags) updates.tags = d.tags;
   if (d.points !== undefined) updates.points = d.points;
@@ -180,6 +213,8 @@ questions.put("/:id", requireRole("teacher", "admin"), async (c) => {
   if (d.boilerplateCode) updates.boilerplate_code = d.boilerplateCode;
   if (d.solution !== undefined) updates.solution = d.solution;
   if (d.hints) updates.hints = d.hints;
+  if (d.options !== undefined) updates.options = d.options;
+  if (d.correctAnswer !== undefined) updates.correct_answer = d.correctAnswer;
   if (d.isVisible !== undefined) updates.is_visible = d.isVisible;
 
   const { data, error } = await supabase
@@ -242,6 +277,7 @@ function mapQuestion(row: any) {
     title: row.title,
     description: row.description,
     difficulty: row.difficulty,
+    questionType: row.question_type ?? "coding",
     topic: row.topic,
     tags: row.tags ?? [],
     points: row.points,
@@ -251,6 +287,8 @@ function mapQuestion(row: any) {
     boilerplateCode: row.boilerplate_code ?? {},
     solution: row.solution,
     hints: row.hints ?? [],
+    options: row.options ?? null,
+    correctAnswer: row.correct_answer ?? null,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

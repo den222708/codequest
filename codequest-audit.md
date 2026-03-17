@@ -24,12 +24,16 @@
 - Zod validation added for auth, users, questions, assessments, submissions, execute, analytics, system logs.
 - Build now passes after type shims and schema updates.
 
-## Remaining gaps (priority)
-- Persist lockout/refresh blacklist and enforce session timeout; align role/status enums end-to-end.
-- Standardize backup size units and migrate JSON columns to Prisma `Json`.
+## Remaining gaps (priority) — Updated 2026-03-11
+- ~~Persist lockout/refresh blacklist and enforce session timeout~~ — **DONE** (token blacklist, 30-min timeout, lockout after 5 attempts, concurrent session limit)
+- ~~Align role/status enums end-to-end~~ — **DONE** (3-role model: student/teacher|professor/admin)
+- ~~Replace simulated executor~~ — **DONE** (Programiz primary, Judge0 fallback)
+- ~~Notification backend~~ — **DONE** (CRUD endpoints in bennett-backend)
+- ~~Password history + expiry~~ — **DONE** (cannot reuse last 5, 90-day expiry)
 - Flesh out question type behavior (MCQ/short/TF/file upload) and assessment status enums.
-- Replace simulated executor with real sandbox (Judge0/Piston) and add plagiarism + websocket/live-monitor pipeline.
-- Move to Postgres with migrations; add structured logging, error tracking, email service, observability.
+- Add real plagiarism detection (MOSS/Dolos integration).
+- Add WebSocket live-monitor pipeline.
+- Add structured logging, error tracking, email service, observability.
 
 ## Medium issues / polish
 - **SQLite default for production**: `DATABASE_URL` points to a local SQLite file; lacks migrations/setup for Postgres/MySQL if needed.

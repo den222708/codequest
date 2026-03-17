@@ -39,11 +39,14 @@ const StudentProfile: React.FC = () => {
       const totalScore = submissions.reduce((sum, s) => sum + s.score, 0);
       const maxScore = submissions.reduce((sum, s) => sum + s.maxScore, 0);
 
+      const completedAssessmentIds = new Set(
+        submissions.filter(s => s.status === 'passed').map(s => s.assessmentId)
+      );
       setStats({
-        assessmentsCompleted: assessments?.length || 0,
+        assessmentsCompleted: completedAssessmentIds.size,
         problemsSolved: completed,
         averageScore: maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0,
-        streak: Math.floor(Math.random() * 15) + 5, // Mock streak
+        streak: 0,
       });
     }
   }, [submissions, assessments]);

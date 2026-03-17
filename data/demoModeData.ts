@@ -32,6 +32,7 @@ Example 2:
 Input: nums = [3,2,4], target = 6
 Output: 1 2`,
     difficulty: 'easy',
+    questionType: 'coding',
     topic: 'Arrays',
     tags: ['arrays', 'hash-table'],
     points: 50,
@@ -155,6 +156,7 @@ Example:
 Input: s = "()[]{}"
 Output: true`,
     difficulty: 'easy',
+    questionType: 'coding',
     topic: 'Stacks',
     tags: ['stack', 'strings'],
     points: 50,
@@ -272,6 +274,7 @@ Example:
 Input: nums = [-1,0,3,5,9,12], target = 9
 Output: 4`,
     difficulty: 'medium',
+    questionType: 'coding',
     topic: 'Binary Search',
     tags: ['binary-search', 'arrays'],
     points: 50,
@@ -392,6 +395,7 @@ Input: nums = [-2,1,-3,4,-1,2,1,-5,4]
 Output: 6
 Explanation: [4,-1,2,1] has the largest sum = 6.`,
     difficulty: 'medium',
+    questionType: 'coding',
     topic: 'Dynamic Programming',
     tags: ['dp', 'greedy', 'arrays'],
     points: 50,

@@ -1,6 +1,9 @@
 import { Context, Next } from "hono";
 import { createHash } from "node:crypto";
 import { getSupabaseAdmin } from "../lib/supabase.js";
+import { createChildLogger } from "../lib/logger.js";
+
+const log = createChildLogger({ module: "auth-middleware" });
 
 export type AppRole = "student" | "teacher" | "admin";
 
@@ -8,6 +11,9 @@ const VALID_ROLES: ReadonlySet<string> = new Set<AppRole>(["student", "teacher",
 
 /** 30-minute inactivity timeout (in milliseconds) */
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+
+/** 90-day password expiry (in milliseconds) */
+const PASSWORD_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
 
 /** Hash a JWT for blacklist storage (avoids storing raw tokens) */
 export function hashToken(token: string): string {
@@ -75,21 +81,29 @@ export async function authMiddleware(c: Context, next: Next) {
       .update({ last_active_at: new Date().toISOString() })
       .eq("id", session.id)
       .then(({ error: updateErr }) => {
-        if (updateErr) console.error("active_sessions update failed:", updateErr.message);
+        if (updateErr) log.error({ err: updateErr }, "active_sessions update failed");
       });
   }
   // Note: if no session record found (e.g. legacy tokens before this feature),
   // we still allow the request — the session table is populated on new logins.
 
-  // Fetch profile to get role + name
+  // Fetch profile to get role + name + password expiry
   const { data: profile, error: profileErr } = await supabase
     .from("profiles")
-    .select("name, role")
+    .select("name, role, password_changed_at")
     .eq("user_id", data.user.id)
     .single();
 
   if (profileErr || !profile) {
     return c.json({ success: false, error: "User profile not found" }, 403);
+  }
+
+  // Check 90-day password expiry (skip for auth/change-password endpoint)
+  if (profile.password_changed_at && !c.req.path.includes("/auth/change-password")) {
+    const changedAt = new Date(profile.password_changed_at).getTime();
+    if (Date.now() - changedAt > PASSWORD_EXPIRY_MS) {
+      return c.json({ success: false, error: "Password expired. Please change your password.", code: "PASSWORD_EXPIRED" }, 403);
+    }
   }
 
   const role = VALID_ROLES.has(profile.role) ? (profile.role as AppRole) : "student";

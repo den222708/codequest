@@ -17,6 +17,19 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      test: {
+        globals: true,
+        environment: 'jsdom',
+        include: ['**/*.test.{ts,tsx}'],
+        exclude: ['node_modules', 'bennett-backend', 'backend'],
+        setupFiles: ['./test/setup.ts'],
+        css: true,
+        coverage: {
+          provider: 'v8',
+          include: ['components/**', 'store/**', 'services/**', 'pages/**', 'hooks/**'],
+          exclude: ['**/*.test.{ts,tsx}'],
+        },
+      },
     };
 });

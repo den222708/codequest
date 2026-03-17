@@ -4,6 +4,7 @@ import { getSupabaseAdmin, createSupabaseClient } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { cacheGet, cacheSet, cacheFlushPattern } from "../lib/cache.js";
+import { notifyAssessmentPublished } from "../services/notificationService.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
 
@@ -275,6 +276,15 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
     updates.status = statusVal;
   }
 
+  // Track if this is a publish transition (for notification)
+  let wasPublished = false;
+  if (statusVal === "published") {
+    const { data: prev } = await supabase.from("assessments").select("status, title").eq("id", id).single();
+    if (prev && prev.status !== "published") {
+      wasPublished = true;
+    }
+  }
+
   const { data, error } = await supabase
     .from("assessments")
     .update(updates)
@@ -294,6 +304,17 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
       points: 0,
     }));
     await supabase.from("assessment_questions").insert(questionLinks);
+  }
+
+  // If newly published, notify students in assigned classes
+  if (wasPublished) {
+    const { data: assignments } = await supabase
+      .from("assessment_assignments")
+      .select("class_id")
+      .eq("assessment_id", id);
+    const classIds = (assignments ?? []).map((a: any) => a.class_id);
+    // Fire-and-forget — does not block response
+    notifyAssessmentPublished(id!, String((data as any).title ?? "Assessment"), classIds as string[]);
   }
 
   cacheFlushPattern("assessments:");

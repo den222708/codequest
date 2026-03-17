@@ -4,6 +4,7 @@ import { getSupabaseAdmin, createSupabaseClient } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { runTests } from "../services/testRunner.js";
+import { notifySubmissionGraded, notifyAttemptCompleted } from "../services/notificationService.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
 
@@ -14,8 +15,9 @@ const submitSchema = z.object({
   assessmentId: z.string().uuid(),
   questionId: z.string().uuid(),
   attemptId: z.string().uuid(),
-  code: z.string().min(1).max(50000),
-  language: z.string(),
+  code: z.string().max(50000).default(""),
+  language: z.string().default("text"),
+  answer: z.string().max(10000).optional(),
 });
 
 // ── POST /submissions ─────────────────────────────────────────────────
@@ -25,7 +27,7 @@ submissions.post("/", requireRole("student"), async (c) => {
   const parsed = submitSchema.safeParse(body);
   if (!parsed.success) return sendError(c, 400, parsed.error.errors[0].message);
 
-  const { assessmentId, questionId, attemptId, code, language } = parsed.data;
+  const { assessmentId, questionId, attemptId, code, language, answer } = parsed.data;
   const token = c.get("token") as string;
   const userDb = createSupabaseClient(token);
   const supabase = getSupabaseAdmin();
@@ -66,8 +68,57 @@ submissions.post("/", requireRole("student"), async (c) => {
 
   if (!question) return sendError(c, 404, "Question not found");
 
-  // Run tests
-  const testResults = await runTests(code, language, question.test_cases ?? []);
+  const questionType = question.question_type ?? "coding";
+  let submissionScore = 0;
+  let submissionMaxScore = question.points ?? 0;
+  let testsPassed = 0;
+  let testsTotal = 0;
+  let testResults: any[] = [];
+  let submissionStatus = "partial";
+  let submissionCode = code;
+
+  if (questionType === "coding") {
+    // Run code tests (original behavior)
+    if (!code || code.trim().length === 0) return sendError(c, 400, "Code is required for coding questions");
+    const codeTestResults = await runTests(code, language, question.test_cases ?? []);
+    submissionScore = codeTestResults.earnedPoints;
+    submissionMaxScore = codeTestResults.totalPoints;
+    testsPassed = codeTestResults.passed;
+    testsTotal = codeTestResults.totalTests;
+    testResults = codeTestResults.results;
+    submissionStatus = codeTestResults.failed === 0 ? "accepted" : "partial";
+  } else {
+    // Non-coding question grading (MCQ, true/false, short answer)
+    if (!answer && answer !== "") return sendError(c, 400, "Answer is required for this question type");
+    submissionCode = answer ?? "";
+    testsTotal = 1;
+
+    if (questionType === "mcq") {
+      // Compare selected option ID to the correct option
+      const options = question.options ?? [];
+      const correctOption = options.find((o: any) => o.isCorrect);
+      const isCorrect = correctOption && answer === correctOption.id;
+      submissionScore = isCorrect ? submissionMaxScore : 0;
+      testsPassed = isCorrect ? 1 : 0;
+      submissionStatus = isCorrect ? "accepted" : "wrong_answer";
+      testResults = [{ test: "MCQ Answer", passed: !!isCorrect, expected: correctOption?.text ?? "", actual: answer }];
+    } else if (questionType === "true_false") {
+      const isCorrect = answer?.toLowerCase() === (question.correct_answer ?? "").toLowerCase();
+      submissionScore = isCorrect ? submissionMaxScore : 0;
+      testsPassed = isCorrect ? 1 : 0;
+      submissionStatus = isCorrect ? "accepted" : "wrong_answer";
+      testResults = [{ test: "True/False", passed: isCorrect, expected: question.correct_answer, actual: answer }];
+    } else if (questionType === "short_answer") {
+      // Case-insensitive, trimmed comparison
+      const expected = (question.correct_answer ?? "").trim().toLowerCase();
+      const actual = (answer ?? "").trim().toLowerCase();
+      const isCorrect = actual === expected;
+      submissionScore = isCorrect ? submissionMaxScore : 0;
+      testsPassed = isCorrect ? 1 : 0;
+      submissionStatus = isCorrect ? "accepted" : "wrong_answer";
+      testResults = [{ test: "Short Answer", passed: isCorrect, expected: question.correct_answer, actual: answer }];
+    }
+  }
 
   // Save submission
   const { data: submission, error } = await supabase
@@ -77,19 +128,28 @@ submissions.post("/", requireRole("student"), async (c) => {
       assessment_id: assessmentId,
       question_id: questionId,
       attempt_id: attemptId,
-      code,
-      language,
-      score: testResults.earnedPoints,
-      max_score: testResults.totalPoints,
-      tests_passed: testResults.passed,
-      tests_total: testResults.totalTests,
-      test_results: testResults.results,
-      status: testResults.failed === 0 ? "accepted" : "partial",
+      code: submissionCode,
+      language: questionType === "coding" ? language : questionType,
+      score: submissionScore,
+      max_score: submissionMaxScore,
+      tests_passed: testsPassed,
+      tests_total: testsTotal,
+      test_results: testResults,
+      status: submissionStatus,
     })
     .select()
     .single();
 
   if (error) return sendError(c, 500, error.message);
+
+  // Notify student of test results (fire-and-forget)
+  notifySubmissionGraded(
+    user.id,
+    (question as any).title ?? "Question",
+    (question as any).title ?? "Question",
+    testsPassed,
+    testsTotal,
+  );
 
   // Update attempt score (sum up all submission scores for this attempt)
   const { data: allSubs } = await supabase
@@ -117,7 +177,7 @@ submissions.post("/", requireRole("student"), async (c) => {
     testsPassed: submission.tests_passed,
     testsTotal: submission.tests_total,
     status: submission.status,
-    testResults: testResults.results,
+    testResults: testResults,
     attemptTotalScore: totalScore,
   }, 201);
 });
@@ -219,6 +279,28 @@ submissions.post("/:attemptId/complete", requireRole("student"), async (c) => {
     .single();
 
   if (error || !data) return sendError(c, 400, "Attempt not found or already completed");
+
+  // Notify the assessment creator (professor) that a student completed the attempt
+  const supabase = getSupabaseAdmin();
+  const { data: assessment } = await supabase
+    .from("assessments")
+    .select("created_by, title")
+    .eq("id", data.assessment_id)
+    .single();
+  if (assessment?.created_by) {
+    const { data: student } = await supabase
+      .from("profiles")
+      .select("name")
+      .eq("user_id", user.id)
+      .single();
+    notifyAttemptCompleted(
+      assessment.created_by,
+      (student as any)?.name ?? "A student",
+      (assessment as any).title ?? "Assessment",
+      data.score ?? 0,
+      data.max_score ?? 0,
+    );
+  }
 
   return sendSuccess(c, { message: "Attempt completed", score: data.score, maxScore: data.max_score });
 });

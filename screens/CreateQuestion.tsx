@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Question, TestCase } from '../types';
+import { View, Question, TestCase, QuestionType, MCQOption } from '../types';
 
 interface Props {
   onBack: () => void;
@@ -10,6 +10,7 @@ interface Props {
 
 const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUpdate }) => {
   const isEditing = !!editingQuestion;
+  const [questionType, setQuestionType] = useState<QuestionType>('coding');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
@@ -30,11 +31,17 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
     cpp: `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your code here\n    return 0;\n}`,
   });
   const [selectedLanguage, setSelectedLanguage] = useState<'python' | 'javascript' | 'java' | 'cpp'>('python');
-  const [activeTab, setActiveTab] = useState<'details' | 'testcases' | 'code'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'testcases' | 'code' | 'options' | 'answer'>('details');
+  const [mcqOptions, setMcqOptions] = useState<MCQOption[]>([
+    { id: 'opt-1', text: '', isCorrect: true },
+    { id: 'opt-2', text: '', isCorrect: false },
+  ]);
+  const [correctAnswer, setCorrectAnswer] = useState<string>('');
 
   // Populate form when editing
   useEffect(() => {
     if (editingQuestion) {
+      setQuestionType(editingQuestion.questionType || 'coding');
       setTitle(editingQuestion.title);
       setDescription(editingQuestion.description);
       setDifficulty(editingQuestion.difficulty);
@@ -52,6 +59,8 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
           cpp: editingQuestion.boilerplateCode.cpp || boilerplate.cpp,
         });
       }
+      if (editingQuestion.options) setMcqOptions(editingQuestion.options);
+      if (editingQuestion.correctAnswer) setCorrectAnswer(editingQuestion.correctAnswer);
     }
   }, [editingQuestion]);
 
@@ -95,17 +104,20 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
       title,
       description,
       difficulty,
+      questionType,
       topic,
       tags,
       points,
       timeLimit,
       memoryLimit,
-      testCases,
-      boilerplateCode: boilerplate,
+      testCases: questionType === 'coding' ? testCases : [],
+      boilerplateCode: questionType === 'coding' ? boilerplate : {},
       createdBy: editingQuestion?.createdBy || 'current-user',
       isVisible: editingQuestion?.isVisible ?? true,
       solution: editingQuestion?.solution,
       hints: editingQuestion?.hints,
+      options: questionType === 'mcq' ? mcqOptions : null,
+      correctAnswer: questionType === 'true_false' || questionType === 'short_answer' ? correctAnswer : null,
     };
     
     if (isEditing && editingQuestion && onUpdate) {
@@ -129,7 +141,7 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
             </button>
             <div>
               <h1 className="text-xl font-bold">{isEditing ? 'Edit Question' : 'Create New Question'}</h1>
-              <p className="text-sm text-slate-500">{isEditing ? 'Modify your coding problem' : 'Add a coding problem to your question bank'}</p>
+              <p className="text-sm text-slate-500">{isEditing ? 'Modify your question' : 'Add a question to your question bank'}</p>
             </div>
           </div>
           <div className="flex gap-3">
@@ -156,10 +168,12 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex gap-1">
             {[
-              { id: 'details', label: 'Details', icon: 'description' },
-              { id: 'testcases', label: 'Test Cases', icon: 'checklist' },
-              { id: 'code', label: 'Boilerplate Code', icon: 'code' },
-            ].map(tab => (
+              { id: 'details', label: 'Details', icon: 'description', show: true },
+              { id: 'testcases', label: 'Test Cases', icon: 'checklist', show: questionType === 'coding' },
+              { id: 'code', label: 'Boilerplate Code', icon: 'code', show: questionType === 'coding' },
+              { id: 'options', label: 'Options', icon: 'list', show: questionType === 'mcq' },
+              { id: 'answer', label: 'Answer', icon: 'check_circle', show: questionType === 'true_false' || questionType === 'short_answer' },
+            ].filter(tab => tab.show).map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -245,6 +259,25 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
             <div className="space-y-6">
               <div className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
                 <div>
+                  <label className="block text-sm font-semibold mb-2">Question Type *</label>
+                  <select
+                    value={questionType}
+                    onChange={(e) => {
+                      const newType = e.target.value as QuestionType;
+                      setQuestionType(newType);
+                      setActiveTab('details');
+                    }}
+                    disabled={isEditing}
+                    className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 disabled:opacity-60"
+                  >
+                    <option value="coding">Coding</option>
+                    <option value="mcq">Multiple Choice (MCQ)</option>
+                    <option value="short_answer">Short Answer</option>
+                    <option value="true_false">True / False</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block text-sm font-semibold mb-2">Topic *</label>
                   <select
                     value={topic}
@@ -291,6 +324,7 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
                   />
                 </div>
 
+                {questionType === 'coding' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold mb-2">Time Limit (s)</label>
@@ -311,6 +345,7 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
                     />
                   </div>
                 </div>
+                )}
               </div>
             </div>
           </div>
@@ -439,6 +474,118 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
                 rows={15}
                 className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-[#1e1e1e] text-[#d4d4d4] font-mono text-sm"
                 spellCheck={false}
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'options' && questionType === 'mcq' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold">Answer Options</h2>
+                <p className="text-sm text-slate-500">Define the choices. Exactly one must be marked as correct.</p>
+              </div>
+              <button
+                onClick={() => setMcqOptions([...mcqOptions, { id: `opt-${Date.now()}`, text: '', isCorrect: false }])}
+                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-medium flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg">add</span>
+                Add Option
+              </button>
+            </div>
+
+            {mcqOptions.map((opt, index) => (
+              <div
+                key={opt.id}
+                className={`bg-white dark:bg-background-card rounded-xl border-2 p-5 flex items-start gap-4 ${
+                  opt.isCorrect
+                    ? 'border-green-500 dark:border-green-400'
+                    : 'border-slate-200 dark:border-slate-800'
+                }`}
+              >
+                <button
+                  onClick={() => setMcqOptions(mcqOptions.map(o => ({ ...o, isCorrect: o.id === opt.id })))}
+                  className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                    opt.isCorrect
+                      ? 'border-green-500 bg-green-500 text-white'
+                      : 'border-slate-300 dark:border-slate-600 hover:border-green-400'
+                  }`}
+                >
+                  {opt.isCorrect && <span className="material-symbols-outlined text-sm">check</span>}
+                </button>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Option {String.fromCharCode(65 + index)}</label>
+                  <input
+                    type="text"
+                    value={opt.text}
+                    onChange={(e) => setMcqOptions(mcqOptions.map(o => o.id === opt.id ? { ...o, text: e.target.value } : o))}
+                    placeholder={`Enter option ${String.fromCharCode(65 + index)}...`}
+                    className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
+                  />
+                </div>
+                {mcqOptions.length > 2 && (
+                  <button
+                    onClick={() => {
+                      const filtered = mcqOptions.filter(o => o.id !== opt.id);
+                      // If we removed the correct answer, mark the first one as correct
+                      if (opt.isCorrect && filtered.length > 0) filtered[0].isCorrect = true;
+                      setMcqOptions(filtered);
+                    }}
+                    className="mt-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg"
+                  >
+                    <span className="material-symbols-outlined">delete</span>
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {mcqOptions.filter(o => o.isCorrect).length === 0 && mcqOptions.length > 0 && (
+              <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">warning</span>
+                Please select one correct answer by clicking the circle next to an option.
+              </p>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'answer' && questionType === 'true_false' && (
+          <div className="max-w-xl">
+            <div className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+              <h2 className="text-lg font-bold mb-2">Correct Answer</h2>
+              <p className="text-sm text-slate-500 mb-6">Select whether the statement in the description is true or false.</p>
+              <div className="flex gap-4">
+                {(['true', 'false'] as const).map(val => (
+                  <button
+                    key={val}
+                    onClick={() => setCorrectAnswer(val)}
+                    className={`flex-1 py-4 px-6 rounded-xl font-bold text-lg capitalize border-2 transition-all ${
+                      correctAnswer === val
+                        ? val === 'true'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+                          : 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                    }`}
+                  >
+                    {val}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'answer' && questionType === 'short_answer' && (
+          <div className="max-w-xl">
+            <div className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+              <h2 className="text-lg font-bold mb-2">Correct Answer</h2>
+              <p className="text-sm text-slate-500 mb-4">Enter the expected answer. Matching is case-insensitive and whitespace-trimmed.</p>
+              <input
+                type="text"
+                value={correctAnswer}
+                onChange={(e) => setCorrectAnswer(e.target.value)}
+                placeholder="Enter the correct answer..."
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>

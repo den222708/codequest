@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS questions (
   title           TEXT NOT NULL,
   description     TEXT NOT NULL,
   difficulty      TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
+  question_type   TEXT NOT NULL DEFAULT 'coding' CHECK (question_type IN ('coding', 'mcq', 'short_answer', 'true_false')),
   topic           TEXT NOT NULL,
   tags            TEXT[] DEFAULT '{}',
   points          INT NOT NULL DEFAULT 10,
@@ -36,6 +37,8 @@ CREATE TABLE IF NOT EXISTS questions (
   boilerplate_code JSONB DEFAULT '{}',
   solution        TEXT,
   hints           TEXT[] DEFAULT '{}',
+  options         JSONB DEFAULT NULL,
+  correct_answer  TEXT DEFAULT NULL,
   is_visible      BOOLEAN NOT NULL DEFAULT true,
   usage_count     INT NOT NULL DEFAULT 0,
   created_by      UUID REFERENCES profiles(user_id) ON DELETE SET NULL,
@@ -511,6 +514,29 @@ CREATE TABLE IF NOT EXISTS backups (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ── Backups: RLS ────────────────────────────────────────────
+ALTER TABLE backups ENABLE ROW LEVEL SECURITY;
+
+-- Only admins can view backups
+CREATE POLICY backups_select ON backups FOR SELECT
+  TO authenticated
+  USING (public.is_role(ARRAY['admin']));
+
+-- Only admins can create backups
+CREATE POLICY backups_insert ON backups FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_role(ARRAY['admin']));
+
+-- Only admins can update backup status
+CREATE POLICY backups_update ON backups FOR UPDATE
+  TO authenticated
+  USING (public.is_role(ARRAY['admin']));
+
+-- Only admins can delete backups
+CREATE POLICY backups_delete ON backups FOR DELETE
+  TO authenticated
+  USING (public.is_role(ARRAY['admin']));
+
 -- ── Plagiarism Results ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS plagiarism_results (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -528,6 +554,35 @@ CREATE TABLE IF NOT EXISTS plagiarism_results (
 
 CREATE INDEX IF NOT EXISTS idx_plagiarism_assessment ON plagiarism_results(assessment_id);
 CREATE INDEX IF NOT EXISTS idx_plagiarism_student ON plagiarism_results(student_id);
+
+-- ── Plagiarism Results: add submission_id and question_id columns ────
+ALTER TABLE plagiarism_results ADD COLUMN IF NOT EXISTS submission_id UUID REFERENCES submissions(id) ON DELETE CASCADE;
+ALTER TABLE plagiarism_results ADD COLUMN IF NOT EXISTS question_id UUID REFERENCES questions(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_plagiarism_submission ON plagiarism_results(submission_id);
+CREATE INDEX IF NOT EXISTS idx_plagiarism_question ON plagiarism_results(question_id);
+
+-- ── Plagiarism Results: RLS ─────────────────────────────────
+ALTER TABLE plagiarism_results ENABLE ROW LEVEL SECURITY;
+
+-- Teachers and admins can view all plagiarism results
+CREATE POLICY plagiarism_results_select ON plagiarism_results FOR SELECT
+  TO authenticated
+  USING (public.is_role(ARRAY['teacher', 'admin']));
+
+-- Only service-role or teachers/admins can insert (scan results)
+CREATE POLICY plagiarism_results_insert ON plagiarism_results FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_role(ARRAY['teacher', 'admin']));
+
+-- Teachers/admins can update (review)
+CREATE POLICY plagiarism_results_update ON plagiarism_results FOR UPDATE
+  TO authenticated
+  USING (public.is_role(ARRAY['teacher', 'admin']));
+
+-- Teachers/admins can delete (re-scan clears old results)
+CREATE POLICY plagiarism_results_delete ON plagiarism_results FOR DELETE
+  TO authenticated
+  USING (public.is_role(ARRAY['teacher', 'admin']));
 
 -- ============================================================
 -- Active Sessions (concurrent session tracking + inactivity timeout)
@@ -574,3 +629,111 @@ CREATE POLICY active_sessions_delete ON active_sessions FOR DELETE
 
 -- Cleanup: remove expired sessions older than 24 hours (run periodically)
 -- DELETE FROM active_sessions WHERE last_active_at < now() - interval '24 hours';
+
+-- ============================================================
+-- Notifications
+-- ============================================================
+CREATE TABLE IF NOT EXISTS notifications (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id     UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  message     TEXT NOT NULL,
+  type        TEXT NOT NULL CHECK (type IN ('info', 'success', 'warning', 'error', 'assessment', 'submission', 'system')) DEFAULT 'info',
+  is_read     BOOLEAN NOT NULL DEFAULT false,
+  link        TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, is_read);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY notifications_select ON notifications FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY notifications_insert ON notifications FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY notifications_update ON notifications FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY notifications_delete ON notifications FOR DELETE
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- ============================================================
+-- Password History (prevent reuse of last 5 passwords)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS password_history (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id     UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
+  password_hash TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_history_user ON password_history(user_id);
+
+ALTER TABLE password_history ENABLE ROW LEVEL SECURITY;
+
+-- Only service-role should access this table (no user policies)
+-- Access is via service-role key in auth routes
+
+-- ── Password expiry column on profiles ───────────────────────
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ DEFAULT now();
+
+-- ============================================================
+-- Assessment monitoring mode (standard = REST logging only, proctored = WebSocket + live monitoring)
+-- ============================================================
+ALTER TABLE assessments ADD COLUMN IF NOT EXISTS monitoring_mode TEXT DEFAULT 'standard'
+  CHECK (monitoring_mode IN ('standard', 'proctored'));
+
+-- ============================================================
+-- Monitoring Events (proctored assessment WebSocket event log)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS monitoring_events (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  attempt_id      UUID NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+  assessment_id   UUID NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+  student_id      UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
+  event_type      TEXT NOT NULL CHECK (event_type IN ('heartbeat', 'violation', 'join', 'leave', 'instruction', 'instruction_ack')),
+  payload         JSONB NOT NULL DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_attempt ON monitoring_events(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_assessment ON monitoring_events(assessment_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_type ON monitoring_events(assessment_id, event_type);
+CREATE INDEX IF NOT EXISTS idx_monitoring_events_created ON monitoring_events(created_at);
+
+ALTER TABLE monitoring_events ENABLE ROW LEVEL SECURITY;
+
+-- Teachers/admins can read monitoring events for their assessments
+CREATE POLICY monitoring_events_select_teacher ON monitoring_events FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM assessments a
+      WHERE a.id = assessment_id
+        AND a.created_by = auth.uid()
+    )
+    OR EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE p.user_id = auth.uid()
+        AND p.role = 'admin'
+    )
+  );
+
+-- Students can read their own monitoring events
+CREATE POLICY monitoring_events_select_student ON monitoring_events FOR SELECT
+  TO authenticated
+  USING (student_id = auth.uid());
+
+-- Insert via service-role only (the socket server uses admin client)
+CREATE POLICY monitoring_events_insert ON monitoring_events FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+

@@ -39,7 +39,7 @@ const Signup: React.FC = () => {
   };
 
   const passwordChecks = validatePassword(password);
-  const isPasswordValid = Object.values(passwordChecks).filter(Boolean).length >= 4;
+  const isPasswordValid = Object.values(passwordChecks).every(Boolean);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,13 +69,7 @@ const Signup: React.FC = () => {
 
     try {
       const success = await signup(name, email, password, role);
-      if (success) {
-        const dashboardPath =
-          role === 'student' ? '/student/dashboard' :
-          role === 'professor' ? '/professor/dashboard' :
-          '/admin/dashboard';
-        navigate(dashboardPath, { replace: true });
-      } else {
+      if (!success) {
         setError('An account with this email already exists.');
       }
     } catch (err) {

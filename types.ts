@@ -56,11 +56,20 @@ export interface TestCase {
   timeLimit: number; // in ms
 }
 
+export type QuestionType = 'coding' | 'mcq' | 'short_answer' | 'true_false';
+
+export interface MCQOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
 export interface Question {
   id: string;
   title: string;
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
+  questionType: QuestionType;
   topic: string;
   tags: string[];
   points: number;
@@ -75,6 +84,8 @@ export interface Question {
   };
   solution?: string;
   hints?: string[];
+  options?: MCQOption[] | null;
+  correctAnswer?: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -157,7 +168,7 @@ export interface AssessmentAttempt {
 
 export interface Notification {
   id: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error' | 'assessment' | 'submission' | 'system';
   title: string;
   message: string;
   read: boolean;
@@ -219,21 +230,31 @@ export interface CodeExecutionResult {
 // Plagiarism Types
 export interface PlagiarismResult {
   id: string;
+  assessmentId?: string;
   submissionId: string;
   studentId: string;
   studentName: string;
+  questionId?: string;
   similarityScore: number;
   matchedSubmissions: {
     submissionId: string;
     studentId: string;
     studentName: string;
     similarity: number;
-    matchedLines: { start: number; end: number }[];
+    matchedRegions?: { linesA: { start: number; end: number }; linesB: { start: number; end: number } }[];
+    matchedLines?: { start: number; end: number }[];
   }[];
   flagged: boolean;
   reviewedBy?: string;
   reviewedAt?: string;
   status: 'pending' | 'reviewed' | 'cleared' | 'confirmed';
+  createdAt?: string;
+}
+
+export interface PlagiarismScanSummary {
+  totalPairs: number;
+  flaggedStudents: number;
+  maxSimilarity: number;
 }
 
 // System Logs Types

@@ -2,9 +2,9 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware } from "../middleware/auth.js";
-import { rateLimit, userRateLimit } from "../middleware/rateLimit.js";
+import { rateLimit, userRateLimit, RATE_LIMITS } from "../middleware/rateLimit.js";
 import { LANGUAGES, LANGUAGE_MAP } from "../lib/languages.js";
-import { executeCodeStream } from "../services/programizProxy.js";
+import { executeCodeStream } from "../services/executionDispatcher.js";
 import { runTests } from "../services/testRunner.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
@@ -46,7 +46,7 @@ execute.get("/languages", (c) => {
 // Returns SSE stream of execution output
 execute.post(
   "/",
-  userRateLimit({ max: 20, windowMs: 60_000, keyPrefix: "exec" }),
+  userRateLimit({ max: RATE_LIMITS.EXECUTE, windowMs: 60_000, keyPrefix: "exec" }),
   async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsed = executeSchema.safeParse(body);
@@ -74,7 +74,7 @@ execute.post(
 // ── POST /execute/run-tests ───────────────────────────────────────────
 execute.post(
   "/run-tests",
-  userRateLimit({ max: 10, windowMs: 60_000, keyPrefix: "tests" }),
+  userRateLimit({ max: Math.ceil(RATE_LIMITS.EXECUTE / 2), windowMs: 60_000, keyPrefix: "tests" }),
   async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsed = runTestsSchema.safeParse(body);
