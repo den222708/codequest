@@ -4,3 +4,4 @@ dist/
 *.log
 migration copy.sql
 seed copy.sql
+supabase/_gen_students.cjs
