@@ -1,23 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { View } from '../types';
 import { useApp } from '../store/AppContext';
 
-interface Props {
-  onNavigate: (view: View) => void;
-}
-
-const ProfessorDashboard: React.FC<Props> = ({ onNavigate }) => {
+const ProfessorDashboard: React.FC = () => {
   const { currentUser } = useApp();
   const navigate = useNavigate();
 
   const quickActions = [
     { label: 'Assessments', icon: 'quiz', path: '/professor/assessments', desc: 'Create & manage assessments' },
     { label: 'Question Bank', icon: 'database', path: '/professor/questions', desc: 'Browse & create questions' },
-    { label: 'Analytics', icon: 'bar_chart', path: '/professor/analytics', desc: 'View performance analytics' },
     { label: 'Leaderboard', icon: 'leaderboard', path: '/professor/leaderboard', desc: 'Student rankings' },
-    { label: 'Live Monitor', icon: 'monitor_heart', path: '/professor/live-monitor', desc: 'Monitor live assessments' },
-    { label: 'Plagiarism', icon: 'shield', path: '/professor/plagiarism', desc: 'Review plagiarism reports' },
   ];
 
   return (
@@ -32,7 +24,7 @@ const ProfessorDashboard: React.FC<Props> = ({ onNavigate }) => {
           <button
             key={action.path}
             onClick={() => navigate(action.path)}
-            className="bg-white dark:bg-background-card p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-primary/40 transition-all text-left group"
+            className="bg-white dark:bg-background-card p-6 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all text-left group"
           >
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
               <span className="material-symbols-outlined">{action.icon}</span>

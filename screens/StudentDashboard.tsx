@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Assessment } from '../types';
 import { useApp } from '../store/AppContext';
+import { formatDateShort } from '../utils/formatters';
 
 interface Props {
   onNavigate: (view: View, assessmentId?: string) => void;
@@ -14,11 +15,6 @@ const StudentDashboard: React.FC<Props> = ({ onNavigate, assessments }) => {
     .filter(a => a.status !== 'draft')
     .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())
     .slice(0, 4);
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
 
   const getStatusBadge = (status: string) => {
     if (status === 'active') return 'bg-amber-500/90';
@@ -40,8 +36,8 @@ const StudentDashboard: React.FC<Props> = ({ onNavigate, assessments }) => {
           <h1 className="text-3xl font-bold">Welcome back, {currentUser?.name || 'Student'}</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Here are your upcoming assessments</p>
         </div>
-        <button onClick={() => onNavigate('all-assessments')} className="bg-primary hover:bg-primary-dark text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-primary/20">
-          <span className="material-symbols-outlined text-sm">assignment</span>
+        <button onClick={() => onNavigate('all-assessments')} className="bg-primary hover:bg-primary-dark text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all shadow-sm">
+          <span className="material-symbols-outlined text-sm" aria-hidden="true">assignment</span>
           All Assessments
         </button>
       </div>
@@ -63,7 +59,7 @@ const StudentDashboard: React.FC<Props> = ({ onNavigate, assessments }) => {
 
         {studentAssessments.map((assessment, idx) => (
           <div key={assessment.id} className="flex flex-col sm:flex-row gap-4 bg-white dark:bg-background-card p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all">
-            <div className="w-full sm:w-48 h-32 rounded-lg relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
+            <div className="w-full sm:w-48 h-32 rounded-lg relative overflow-hidden bg-slate-800 flex items-center justify-center">
               <span className="material-symbols-outlined text-white/80 text-4xl">{idx % 2 === 0 ? 'code' : 'data_object'}</span>
               <div className={`absolute top-2 left-2 ${getStatusBadge(assessment.status)} text-white text-[10px] font-bold px-2 py-1 rounded uppercase`}>
                 {assessment.status === 'active' ? 'IN PROGRESS' : assessment.status}
@@ -78,7 +74,7 @@ const StudentDashboard: React.FC<Props> = ({ onNavigate, assessments }) => {
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{assessment.courseCode || 'Course'} • {assessment.professorName || 'Professor'}</p>
               </div>
               <div className="flex items-center justify-between mt-4">
-                <span className="text-xs text-slate-500">Due: {formatDate(assessment.endDate)}</span>
+                <span className="text-xs text-slate-500">Due: {formatDateShort(assessment.endDate)}</span>
                 <button
                   onClick={() => onNavigate('instructions', assessment.id)}
                   className="bg-primary text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"

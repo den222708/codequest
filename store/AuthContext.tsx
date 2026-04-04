@@ -52,6 +52,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setCurrentUser(storedUser);
       _onLoginSuccess.current.forEach(cb => cb(storedUser));
     }
+
+    // Listen for session expiry from apiClient
+    const handleSessionExpired = () => {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+    };
+    window.addEventListener('cq:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('cq:session-expired', handleSessionExpired);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

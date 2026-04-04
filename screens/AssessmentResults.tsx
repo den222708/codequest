@@ -74,7 +74,7 @@ const AssessmentResults: React.FC<Props> = ({ onBack }) => {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold mb-2">
               <span className="material-symbols-outlined text-sm">check_circle</span> SUBMITTED
             </div>
-            <h1 className="text-3xl font-black text-slate-900 dark:text-white">Assessment Completed</h1>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Assessment Completed</h1>
             <p className="text-slate-500">{assessment?.title || 'Assessment'}{assessment?.courseCode ? ` (${assessment.courseCode})` : ''}</p>
           </div>
           <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
@@ -90,7 +90,7 @@ const AssessmentResults: React.FC<Props> = ({ onBack }) => {
                 <path className="text-slate-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3"/>
                 <path className="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray={`${percentage}, 100`} strokeLinecap="round" strokeWidth="3"/>
               </svg>
-              <span className="absolute text-4xl font-black">{percentage}%</span>
+              <span className="absolute text-4xl font-bold">{percentage}%</span>
             </div>
             <p className="text-2xl font-bold mb-1">{totals.score} / {totals.maxScore}</p>
             <p className={`font-bold text-sm ${percentage >= (assessment?.passingScore || 60) ? 'text-emerald-500' : 'text-amber-500'}`}>

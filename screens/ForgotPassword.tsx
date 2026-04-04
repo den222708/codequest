@@ -37,10 +37,10 @@ const ForgotPassword: React.FC = () => {
           <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
             <span className="material-symbols-outlined text-2xl">code_blocks</span>
           </div>
-          <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">CodeQuest</span>
+          <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">CodeQuest</span>
         </div>
 
-        <div className="bg-white dark:bg-background-card rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-8">
+        <div className="bg-white dark:bg-background-card rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 p-8">
           {!sent ? (
             <>
               <div className="text-center mb-8">
@@ -82,7 +82,7 @@ const ForgotPassword: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 px-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-lg shadow-primary/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <>

@@ -4,8 +4,11 @@ import { getSupabaseAdmin, createSupabaseClient } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { cacheGet, cacheSet, cacheFlushPattern } from "../lib/cache.js";
+import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
+
+const log = createChildLogger({ module: "questions" });
 
 const questions = new Hono<AppEnv>();
 questions.use("*", authMiddleware);
@@ -106,7 +109,10 @@ questions.get("/", async (c) => {
   query = query.order("created_at", { ascending: false });
 
   const { data, error } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to fetch questions");
+    return sendError(c, 500, "Failed to fetch questions");
+  }
 
   const mapped = (data ?? []).map(mapQuestion);
   cacheSet(cacheKey, mapped, 120);
@@ -176,7 +182,10 @@ questions.post("/", requireRole("teacher", "admin"), async (c) => {
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to create question");
+    return sendError(c, 500, "Failed to create question");
+  }
 
   cacheFlushPattern("questions:");
   return sendSuccess(c, mapQuestion(data), 201);
@@ -226,7 +235,10 @@ questions.put("/:id", requireRole("teacher", "admin"), async (c) => {
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, questionId: id }, "Failed to update question");
+    return sendError(c, 500, "Failed to update question");
+  }
 
   cacheFlushPattern("questions:");
   return sendSuccess(c, mapQuestion(data));
@@ -246,7 +258,10 @@ questions.delete("/:id", requireRole("teacher", "admin"), async (c) => {
   }
 
   const { error } = await supabase.from("questions").delete().eq("id", id);
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, questionId: id }, "Failed to delete question");
+    return sendError(c, 500, "Failed to delete question");
+  }
 
   cacheFlushPattern("questions:");
   return sendSuccess(c, { message: "Question deleted" });
@@ -254,12 +269,21 @@ questions.delete("/:id", requireRole("teacher", "admin"), async (c) => {
 
 // ── PATCH /questions/:id/visibility ───────────────────────────────────
 questions.patch("/:id/visibility", requireRole("teacher", "admin"), async (c) => {
+  const user = c.get("user") as AuthUser;
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const isVisible = body?.isVisible;
   if (typeof isVisible !== "boolean") return sendError(c, 400, "isVisible (boolean) is required");
 
   const supabase = getSupabaseAdmin();
+
+  // Teachers can only toggle visibility on their own questions
+  if (user.role === "teacher") {
+    const { data: existing } = await supabase.from("questions").select("created_by").eq("id", id).single();
+    if (!existing) return sendError(c, 404, "Question not found");
+    if (existing.created_by !== user.id) return sendError(c, 403, "Can only modify your own questions");
+  }
+
   const { data, error } = await supabase
     .from("questions")
     .update({ is_visible: isVisible, updated_at: new Date().toISOString() })
@@ -267,7 +291,7 @@ questions.patch("/:id/visibility", requireRole("teacher", "admin"), async (c) =>
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) return sendError(c, 500, "Failed to update question visibility");
 
   cacheFlushPattern("questions:");
   return sendSuccess(c, mapQuestion(data));

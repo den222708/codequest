@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { createHash } from "node:crypto";
+// crypto imports moved to hashPasswordForHistory below
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { hashToken, authMiddleware } from "../middleware/auth.js";
@@ -90,35 +90,36 @@ async function recordFailedLogin(supabase: ReturnType<typeof getSupabaseAdmin>, 
 }
 
 async function resetFailedLogins(supabase: ReturnType<typeof getSupabaseAdmin>, email: string): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from("profiles")
     .update({ failed_login_attempts: 0, locked_until: null })
     .eq("email", email);
+  if (error) log.error({ err: error, email }, "resetFailedLogins failed");
 }
 
 // ── Helper: manage concurrent sessions ────────────────────────────────
 async function enforceSessionLimit(supabase: ReturnType<typeof getSupabaseAdmin>, userId: string, newTokenHash: string, ip: string): Promise<void> {
-  // Delete excess sessions FIRST to avoid TOCTOU race
-  const { data: sessions } = await supabase
-    .from("active_sessions")
-    .select("id, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
-
-  if (sessions && sessions.length >= MAX_CONCURRENT_SESSIONS) {
-    // Remove oldest sessions until count is MAX - 1 (making room for the new one)
-    const toRemove = sessions.slice(0, sessions.length - MAX_CONCURRENT_SESSIONS + 1);
-    const idsToRemove = toRemove.map((s) => s.id);
-    await supabase.from("active_sessions").delete().in("id", idsToRemove);
-  }
-
-  // Insert new session
+  // Insert new session first, then prune excess — avoids TOCTOU race
+  // where two concurrent logins both see room and both insert.
   await supabase.from("active_sessions").insert({
     user_id: userId,
     token_hash: newTokenHash,
     ip_address: ip,
     last_active_at: new Date().toISOString(),
   });
+
+  // Post-insert cleanup: keep only the newest MAX_CONCURRENT_SESSIONS
+  const { data: sessions } = await supabase
+    .from("active_sessions")
+    .select("id, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  if (sessions && sessions.length > MAX_CONCURRENT_SESSIONS) {
+    const toRemove = sessions.slice(0, sessions.length - MAX_CONCURRENT_SESSIONS);
+    const idsToRemove = toRemove.map((s) => s.id);
+    await supabase.from("active_sessions").delete().in("id", idsToRemove);
+  }
 }
 
 // ── POST /auth/login ──────────────────────────────────────────────────
@@ -329,6 +330,22 @@ auth.post("/refresh", async (c) => {
     return sendError(c, 401, "Invalid or expired refresh token");
   }
 
+  // Check password expiry before issuing new tokens
+  if (data.user) {
+    const PASSWORD_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("password_changed_at")
+      .eq("user_id", data.user.id)
+      .single();
+    if (profile?.password_changed_at) {
+      const changedAt = new Date(profile.password_changed_at).getTime();
+      if (Date.now() - changedAt > PASSWORD_EXPIRY_MS) {
+        return sendError(c, 403, "Password expired. Please change your password.");
+      }
+    }
+  }
+
   // Update active_sessions: replace old token hash with new one
   if (oldTokenHash && data.user) {
     const newTokenHash = hashToken(data.session.access_token);
@@ -375,9 +392,24 @@ const passwordSchema = z
   .regex(/[0-9]/, "Must contain a digit")
   .regex(/[^A-Za-z0-9]/, "Must contain a special character");
 
-// ── Helper: hash password for history comparison ──────────────────────
-function hashPassword(password: string): string {
-  return createHash("sha256").update(password).digest("hex");
+// ── Helper: hash password for history comparison (scrypt — salted) ────
+import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
+
+function hashPasswordForHistory(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const derived = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${derived}`;
+}
+
+function verifyPasswordAgainstHash(password: string, storedHash: string): boolean {
+  const [salt, hash] = storedHash.split(":");
+  if (!salt || !hash) return false;
+  const derived = scryptSync(password, salt, 64);
+  try {
+    return timingSafeEqual(derived, Buffer.from(hash, "hex"));
+  } catch {
+    return false;
+  }
 }
 
 // ── Helper: check password against history ────────────────────────────
@@ -388,7 +420,6 @@ async function isPasswordReused(
   userId: string,
   newPassword: string
 ): Promise<boolean> {
-  const newHash = hashPassword(newPassword);
   const { data } = await supabase
     .from("password_history")
     .select("password_hash")
@@ -396,7 +427,7 @@ async function isPasswordReused(
     .order("created_at", { ascending: false })
     .limit(PASSWORD_HISTORY_LIMIT);
 
-  return (data ?? []).some((row) => row.password_hash === newHash);
+  return (data ?? []).some((row) => verifyPasswordAgainstHash(newPassword, row.password_hash));
 }
 
 async function recordPasswordInHistory(
@@ -404,7 +435,7 @@ async function recordPasswordInHistory(
   userId: string,
   password: string
 ): Promise<void> {
-  const pwHash = hashPassword(password);
+  const pwHash = hashPasswordForHistory(password);
   await supabase.from("password_history").insert({
     user_id: userId,
     password_hash: pwHash,
@@ -461,7 +492,8 @@ auth.post("/change-password", authMiddleware, async (c) => {
     password: newPassword,
   });
   if (updateErr) {
-    return sendError(c, 500, updateErr.message);
+    log.error({ err: updateErr, userId: user.id }, "Failed to change password");
+    return sendError(c, 500, "Failed to change password");
   }
 
   // Record in history and update timestamp

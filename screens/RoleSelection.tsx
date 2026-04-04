@@ -12,14 +12,14 @@ const RoleSelection: React.FC = () => {
     const dashboardPath =
       role === 'student' ? '/student/dashboard' :
       role === 'professor' ? '/professor/dashboard' :
-      '/admin/dashboard';
+      '/admin/courses';
     navigate(dashboardPath, { replace: true });
   };
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark flex flex-col items-center justify-center p-6 text-slate-900 dark:text-white">
       <div className="max-w-4xl w-full flex flex-col gap-10">
         <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
             Welcome! Please select your role
           </h1>
           <p className="text-lg text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
@@ -31,9 +31,9 @@ const RoleSelection: React.FC = () => {
           {/* Student */}
           <button
             onClick={() => handleRoleSelect('student')}
-            className="group relative flex flex-col items-center text-center p-8 rounded-2xl bg-white dark:bg-background-card border-2 border-transparent hover:border-primary hover:shadow-2xl transition-all duration-300"
+            className="group relative flex flex-col items-center text-center p-8 rounded-xl bg-white dark:bg-background-card border-2 border-transparent hover:border-primary/50 hover:shadow-md transition-all duration-200"
           >
-            <div className="mb-6 rounded-full bg-primary p-5 text-white shadow-lg group-hover:scale-110 transition-transform">
+            <div className="mb-6 rounded-full bg-primary p-5 text-white shadow-sm group-hover:scale-105 transition-transform">
               <span className="material-symbols-outlined text-4xl">school</span>
             </div>
             <h3 className="text-xl font-bold mb-3">Student</h3>
@@ -45,7 +45,7 @@ const RoleSelection: React.FC = () => {
           {/* Professor */}
           <button
             onClick={() => handleRoleSelect('professor')}
-            className="group relative flex flex-col items-center text-center p-8 rounded-2xl bg-white dark:bg-background-card border-2 border-transparent hover:border-primary hover:shadow-2xl transition-all duration-300"
+            className="group relative flex flex-col items-center text-center p-8 rounded-xl bg-white dark:bg-background-card border-2 border-transparent hover:border-primary/50 hover:shadow-md transition-all duration-200"
           >
             <div className="mb-6 rounded-full bg-primary/10 text-primary p-5 group-hover:bg-primary group-hover:text-white transition-colors">
               <span className="material-symbols-outlined text-4xl">co_present</span>
@@ -59,7 +59,7 @@ const RoleSelection: React.FC = () => {
           {/* Admin */}
           <button
             onClick={() => handleRoleSelect('admin')}
-            className="group relative flex flex-col items-center text-center p-8 rounded-2xl bg-white dark:bg-background-card border-2 border-transparent hover:border-primary hover:shadow-2xl transition-all duration-300"
+            className="group relative flex flex-col items-center text-center p-8 rounded-xl bg-white dark:bg-background-card border-2 border-transparent hover:border-primary/50 hover:shadow-md transition-all duration-200"
           >
             <div className="mb-6 rounded-full bg-primary/10 text-primary p-5 group-hover:bg-primary group-hover:text-white transition-colors">
               <span className="material-symbols-outlined text-4xl">admin_panel_settings</span>

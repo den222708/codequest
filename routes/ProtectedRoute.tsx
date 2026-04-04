@@ -22,7 +22,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole,
   const rolesToCheck = allowedRoles || (requiredRole ? [requiredRole] : []);
 
   // If roles are specified and user doesn't have one, redirect to their dashboard
-  if (rolesToCheck.length > 0 && !rolesToCheck.includes(currentUser?.role as Role)) {
+  if (rolesToCheck.length > 0 && (!currentUser?.role || !rolesToCheck.includes(currentUser.role))) {
     const dashboardPath =
       currentUser?.role === 'student'
         ? '/student/dashboard'

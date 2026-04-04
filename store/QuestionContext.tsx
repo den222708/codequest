@@ -46,7 +46,7 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
       const newQuestion: Question = { ...question, id: `q-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), usageCount: 0 };
       setQuestions(prev => [...prev, newQuestion]);
     }
-  }, []);
+  }, [_addNotification]);
 
   const updateQuestion = useCallback(async (id: string, updates: Partial<Question>) => {
     try {
@@ -66,7 +66,7 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error('Failed to delete question:', err);
       _addNotification.current?.({ type: 'error', title: 'Delete Failed', message: 'Could not delete the question.' });
     }
-  }, []);
+  }, [_addNotification]);
 
   const _setQuestions = useCallback((q: Question[]) => setQuestions(q), []);
 

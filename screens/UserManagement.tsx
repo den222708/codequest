@@ -159,7 +159,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
         <div className="flex gap-3">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-5 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
+            className="px-5 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-sm"
           >
             <span className="material-symbols-outlined text-lg">person_add</span>
             Add User
@@ -175,19 +175,27 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
           { label: 'Professors', value: stats.professors, icon: 'co_present', color: 'purple' },
           { label: 'Admins', value: stats.admins, icon: 'admin_panel_settings', color: 'amber' },
           { label: 'Active', value: stats.active, icon: 'check_circle', color: 'green' },
-        ].map(stat => (
-          <div key={stat.label} className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 font-medium">{stat.label}</p>
-                <p className="text-2xl font-bold mt-1">{stat.value}</p>
-              </div>
-              <div className={`p-2 rounded-lg bg-${stat.color}-500/10 text-${stat.color}-500`}>
-                <span className="material-symbols-outlined">{stat.icon}</span>
+        ].map(stat => {
+          const colorMap: Record<string, string> = {
+            blue: 'bg-blue-500/10 text-blue-500',
+            purple: 'bg-purple-500/10 text-purple-500',
+            amber: 'bg-amber-500/10 text-amber-500',
+            green: 'bg-green-500/10 text-green-500',
+          };
+          return (
+            <div key={stat.label} className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 font-medium">{stat.label}</p>
+                  <p className="text-2xl font-bold mt-1">{stat.value}</p>
+                </div>
+                <div className={`p-2 rounded-lg ${colorMap[stat.color] ?? ''}`}>
+                  <span className="material-symbols-outlined">{stat.icon}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -293,7 +301,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
       {/* Create/Edit Modal */}
       {(showCreateModal || editingUser) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-lg w-full shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold">
                 {editingUser ? 'Edit User' : 'Create New User'}
@@ -410,7 +418,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
       {/* Generated Password Modal */}
       {createdPassword && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-md w-full shadow-2xl">
+          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-md w-full shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-2xl text-green-500">check_circle</span>
@@ -443,7 +451,7 @@ const UserManagement: React.FC<Props> = ({ users, onAddUser, onUpdateUser, onDel
       {/* Delete Confirmation */}
       {deleteUserId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-md w-full shadow-2xl">
+          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-md w-full shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-2xl text-red-500">warning</span>

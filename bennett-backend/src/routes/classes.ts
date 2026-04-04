@@ -4,8 +4,11 @@ import { getSupabaseAdmin } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { cacheFlushPattern } from "../lib/cache.js";
+import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
+
+const log = createChildLogger({ module: "classes" });
 
 const classes = new Hono<AppEnv>();
 classes.use("*", authMiddleware);
@@ -46,7 +49,10 @@ classes.get("/", async (c) => {
 
   query = query.order("created_at", { ascending: false });
   const { data, error } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to fetch classes");
+    return sendError(c, 500, "Failed to fetch classes");
+  }
 
   return sendSuccess(c, (data ?? []).map(mapClass));
 });
@@ -119,7 +125,8 @@ classes.post("/", requireRole("admin"), async (c) => {
 
   if (error) {
     if (error.code === "23505") return sendError(c, 409, "Class code already exists");
-    return sendError(c, 500, error.message);
+    log.error({ err: error }, "Failed to create class");
+    return sendError(c, 500, "Failed to create class");
   }
 
   return sendSuccess(c, mapClass(data), 201);
@@ -167,7 +174,8 @@ classes.put("/:id", requireRole("admin"), async (c) => {
 
   if (error) {
     if (error.code === "23505") return sendError(c, 409, "Class code already exists");
-    return sendError(c, 500, error.message);
+    log.error({ err: error, classId: id }, "Failed to update class");
+    return sendError(c, 500, "Failed to update class");
   }
 
   return sendSuccess(c, mapClass(data));
@@ -179,7 +187,10 @@ classes.delete("/:id", requireRole("admin"), async (c) => {
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase.from("classes").delete().eq("id", id).select("id").maybeSingle();
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, classId: id }, "Failed to delete class");
+    return sendError(c, 500, "Failed to delete class");
+  }
   if (!data) return sendError(c, 404, "Class not found");
 
   return sendSuccess(c, { message: "Class deleted" });
@@ -209,7 +220,10 @@ classes.get("/:id/students", requireRole("teacher", "admin"), async (c) => {
     .eq("class_id", id)
     .order("enrolled_at", { ascending: true });
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, classId: id }, "Failed to fetch class students");
+    return sendError(c, 500, "Failed to fetch class students");
+  }
 
   const students = (data ?? []).map((row: any) => ({
     enrollmentRecordId: row.id,
@@ -270,7 +284,10 @@ classes.post("/:id/enroll", requireRole("admin"), async (c) => {
     .upsert(rows, { onConflict: "class_id,student_id", ignoreDuplicates: true })
     .select();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, classId: id }, "Failed to enroll students");
+    return sendError(c, 500, "Failed to enroll students");
+  }
 
   const actuallyEnrolled = inserted?.length ?? 0;
   return sendSuccess(c, {
@@ -293,7 +310,10 @@ classes.delete("/:id/enroll/:studentId", requireRole("admin"), async (c) => {
     .eq("class_id", classId)
     .eq("student_id", studentId);
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, classId: classId, studentId }, "Failed to unenroll student");
+    return sendError(c, 500, "Failed to unenroll student");
+  }
   return sendSuccess(c, { message: "Student unenrolled" });
 });
 
@@ -342,7 +362,8 @@ classes.post("/:id/assessments", requireRole("teacher", "admin"), async (c) => {
 
   if (error) {
     if (error.code === "23505") return sendError(c, 409, "Assessment already assigned to this class");
-    return sendError(c, 500, error.message);
+    log.error({ err: error, classId, assessmentId: parsed.data.assessmentId }, "Failed to assign assessment to class");
+    return sendError(c, 500, "Failed to assign assessment to class");
   }
 
   cacheFlushPattern("assessments:");
@@ -369,7 +390,10 @@ classes.delete("/:id/assessments/:assessmentId", requireRole("teacher", "admin")
     .eq("assessment_id", assessmentId)
     .eq("class_id", classId);
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, classId, assessmentId }, "Failed to unassign assessment from class");
+    return sendError(c, 500, "Failed to unassign assessment from class");
+  }
   cacheFlushPattern("assessments:");
   return sendSuccess(c, { message: "Assessment unassigned from class" });
 });
@@ -411,7 +435,10 @@ classes.get("/:id/assessments", async (c) => {
     .eq("class_id", classId)
     .order("assigned_at", { ascending: false });
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, classId }, "Failed to fetch class assessments");
+    return sendError(c, 500, "Failed to fetch class assessments");
+  }
 
   const assessments = (assignments ?? [])
     .filter((a: any) => a.assessments)

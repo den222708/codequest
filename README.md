@@ -17,12 +17,13 @@ This repository contains:
 - Plagiarism scanning with server-side winnowing fingerprints
 - Real-time proctoring/monitoring via Socket.IO namespaces (`/proctoring`, `/admin`)
 - Notifications, activity logs, backups, system health, and leaderboard endpoints
-- Security hardening: JWT auth, lockout, token blacklist, session timeout, password history, RLS
+- Security hardening: JWT auth, lockout, token blacklist, session timeout, scrypt password history, RLS, WebSocket JWT auth, IP restriction enforcement, notification link sanitization (relative paths only), student question-data filtering, teacher IDOR prevention (submissions, plagiarism, analytics, question visibility), generic API error responses (no DB leak)
 
-DevTools protection note:
+DevTools protection:
 
-- The app currently uses custom proctoring heuristics in `services/monitoringService.ts` (`devtools_open` violation events).
-- `disable-devtool` package integration is not enabled in runtime code yet (guide exists at `md files/disable-devtool-guide.md`).
+- `disable-devtool` package is active in production builds (`services/devtoolProtection.ts`). It replaces the page with an "Exam Paused" overlay when DevTools are detected. Developer bypass is available via `?ddtk=<key>` + `VITE_DEVTOOL_BYPASS_HASH` env var. Skipped in dev mode.
+- Custom proctoring heuristics in `services/monitoringService.ts` (`devtools_open` violation events) run independently during proctored assessments.
+- Configuration guide: `md files/disable-devtool-guide.md`.
 
 ## Architecture
 

@@ -5,8 +5,11 @@ import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { runTests } from "../services/testRunner.js";
 import { notifySubmissionGraded, notifyAttemptCompleted } from "../services/notificationService.js";
+import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
+
+const log = createChildLogger({ module: "submissions" });
 
 const submissions = new Hono<AppEnv>();
 submissions.use("*", authMiddleware);
@@ -44,15 +47,24 @@ submissions.post("/", requireRole("student"), async (c) => {
 
   if (!attempt) return sendError(c, 400, "Invalid or expired attempt");
 
-  // Check assessment end_date — reject submissions after the assessment has ended
+  // Check assessment end_date and per-attempt time limit
   const { data: assessmentCheck } = await supabase
     .from("assessments")
-    .select("end_date")
+    .select("end_date, duration")
     .eq("id", assessmentId)
     .single();
 
   if (assessmentCheck?.end_date && new Date(assessmentCheck.end_date) < new Date()) {
     return sendError(c, 403, "Assessment has ended");
+  }
+
+  // Enforce per-attempt time limit: started_at + duration (minutes) + 60s grace
+  if (assessmentCheck?.duration && attempt.started_at) {
+    const startedAt = new Date(attempt.started_at).getTime();
+    const timeLimitMs = assessmentCheck.duration * 60 * 1000 + 60_000; // +60s grace
+    if (Date.now() > startedAt + timeLimitMs) {
+      return sendError(c, 403, "Time limit exceeded for this attempt");
+    }
   }
 
   // Verify question belongs to this assessment
@@ -151,7 +163,10 @@ submissions.post("/", requireRole("student"), async (c) => {
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, userId: user.id, assessmentId, questionId }, "Failed to create submission");
+    return sendError(c, 500, "Failed to create submission");
+  }
 
   // Notify student of test results (fire-and-forget)
   // Fetch assessment title for the notification
@@ -227,11 +242,14 @@ submissions.get("/", async (c) => {
       .select("id")
       .eq("created_by", user.id);
     const teacherAssessmentIds = (teacherAssessments ?? []).map(a => a.id);
-    if (teacherAssessmentIds.length > 0) {
-      query = query.in("assessment_id", teacherAssessmentIds);
-    } else {
+    if (teacherAssessmentIds.length === 0) {
       return sendSuccess(c, []);
     }
+    // If assessmentId filter is provided, verify teacher owns it
+    if (assessmentId && !teacherAssessmentIds.includes(assessmentId)) {
+      return sendError(c, 403, "You do not have access to this assessment's submissions");
+    }
+    query = query.in("assessment_id", teacherAssessmentIds);
     if (studentId) query = query.eq("student_id", studentId);
   } else if (studentId) {
     query = query.eq("student_id", studentId);
@@ -240,10 +258,16 @@ submissions.get("/", async (c) => {
   if (assessmentId) query = query.eq("assessment_id", assessmentId);
   if (questionId) query = query.eq("question_id", questionId);
 
-  query = query.order("created_at", { ascending: false }).limit(100);
+  const offset = Math.max(0, parseInt(c.req.query("offset") ?? "0", 10) || 0);
+  const limit = Math.min(Math.max(1, parseInt(c.req.query("limit") ?? "50", 10) || 50), 100);
+
+  query = query.order("created_at", { ascending: false }).range(offset, offset + limit - 1);
 
   const { data, error } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, userId: user.id }, "Failed to fetch submissions");
+    return sendError(c, 500, "Failed to fetch submissions");
+  }
 
   return sendSuccess(c, (data ?? []).map(mapSubmission));
 });

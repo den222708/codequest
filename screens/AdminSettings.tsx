@@ -8,7 +8,7 @@ const AdminSettings: React.FC = () => {
     <div className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark p-6 md:p-10">
       <div className="max-w-3xl mx-auto space-y-8">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Settings</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">University branding and platform information.</p>
         </div>
 

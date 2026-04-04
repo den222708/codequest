@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { View, Assessment } from '../types';
+import { formatDate, getDifficultyColor, getAssessmentStatusBadge } from '../utils/formatters';
+
+type SortKey = 'date' | 'name' | 'difficulty';
 
 interface Props {
   assessments: Assessment[];
@@ -12,54 +15,28 @@ const AllAssessments: React.FC<Props> = ({ assessments, onNavigate, onStartAsses
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'name' | 'difficulty'>('date');
+  const [sortBy, setSortBy] = useState<SortKey>('date');
 
   const filteredAssessments = assessments.filter(a => {
     const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = filterType === 'all' || a.type === filterType;
     const matchesStatus = filterStatus === 'all' || a.status === filterStatus;
-    // Students should not see draft assessments
     const canSeeStatus = userRole === 'student' ? a.status !== 'draft' : true;
     return matchesSearch && matchesType && matchesStatus && canSeeStatus;
   }).sort((a, b) => {
     if (sortBy === 'date') return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
     if (sortBy === 'name') return a.title.localeCompare(b.title);
+    if (sortBy === 'difficulty') {
+      const order: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 };
+      return (order[a.difficulty] ?? 3) - (order[b.difficulty] ?? 3);
+    }
     return 0;
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <span className="px-2.5 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full text-xs font-bold">Active</span>;
-      case 'published':
-        return <span className="px-2.5 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-full text-xs font-bold">Upcoming</span>;
-      case 'draft':
-        return <span className="px-2.5 py-1 bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400 rounded-full text-xs font-bold">Draft</span>;
-      case 'completed':
-        return <span className="px-2.5 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded-full text-xs font-bold">Completed</span>;
-      default:
-        return null;
-    }
-  };
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner': return 'text-green-500';
-      case 'intermediate': return 'text-yellow-500';
-      case 'advanced': return 'text-red-500';
-      default: return 'text-slate-500';
-    }
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const renderStatusBadge = (status: string) => {
+    const badge = getAssessmentStatusBadge(status as 'active' | 'published' | 'draft' | 'completed');
+    return <span className={`px-2.5 py-1 ${badge.bg} rounded-full text-xs font-bold`}>{badge.label}</span>;
   };
 
   return (
@@ -75,7 +52,7 @@ const AllAssessments: React.FC<Props> = ({ assessments, onNavigate, onStartAsses
         {userRole === 'professor' && (
           <button
             onClick={() => onNavigate('create-assessment')}
-            className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
+            className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-sm"
           >
             <span className="material-symbols-outlined text-lg">add</span>
             Create Assessment
@@ -123,7 +100,7 @@ const AllAssessments: React.FC<Props> = ({ assessments, onNavigate, onStartAsses
             </select>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
               className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
             >
               <option value="date">Sort by Date</option>
@@ -139,12 +116,12 @@ const AllAssessments: React.FC<Props> = ({ assessments, onNavigate, onStartAsses
         {filteredAssessments.map(assessment => (
           <div
             key={assessment.id}
-            className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:shadow-lg transition-all group"
+            className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all group"
           >
             {/* Header */}
             <div className="p-5 border-b border-slate-100 dark:border-slate-700">
               <div className="flex justify-between items-start mb-3">
-                {getStatusBadge(assessment.status)}
+                {renderStatusBadge(assessment.status)}
                 <span className={`text-xs font-bold capitalize ${getDifficultyColor(assessment.difficulty)}`}>
                   {assessment.difficulty}
                 </span>
@@ -208,16 +185,19 @@ const AllAssessments: React.FC<Props> = ({ assessments, onNavigate, onStartAsses
                 </button>
               ) : (
                 <div className="flex gap-2">
-                  <button className="flex-1 py-2 border border-slate-300 dark:border-slate-600 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center gap-1">
+                  <button
+                    onClick={() => onNavigate('edit-assessment', assessment.id)}
+                    className="flex-1 py-2 border border-slate-300 dark:border-slate-600 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center gap-1"
+                  >
                     <span className="material-symbols-outlined text-lg">edit</span>
                     Edit
                   </button>
                   <button
-                    onClick={() => onNavigate('live-monitor')}
+                    onClick={() => onNavigate('instructions', assessment.id)}
                     className="flex-1 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-medium flex items-center justify-center gap-1"
                   >
-                    <span className="material-symbols-outlined text-lg">monitoring</span>
-                    Monitor
+                    <span className="material-symbols-outlined text-lg">visibility</span>
+                    View
                   </button>
                 </div>
               )}

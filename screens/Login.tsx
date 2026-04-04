@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { login, currentUser } = useApp();
 
-  const from = (location.state as any)?.from?.pathname ||
-    (currentUser?.role === 'student' ? '/student/dashboard' :
-      currentUser?.role === 'professor' ? '/professor/dashboard' :
-        currentUser?.role === 'admin' ? '/admin/dashboard' : '/');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,7 +18,7 @@ const Login: React.FC = () => {
       const dashboardPath =
         currentUser.role === 'student' ? '/student/dashboard' :
           currentUser.role === 'professor' ? '/professor/dashboard' :
-            '/admin/dashboard';
+            '/admin/courses';
       navigate(dashboardPath, { replace: true });
     }
   }, [currentUser, navigate]);
@@ -50,7 +45,7 @@ const Login: React.FC = () => {
   return (
     <div className="min-h-screen flex bg-background-light dark:bg-background-dark">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary via-primary-dark to-[#0a4f5c]">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-primary-dark">
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           <div>
@@ -58,14 +53,14 @@ const Login: React.FC = () => {
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                 <span className="material-symbols-outlined text-2xl">code_blocks</span>
               </div>
-              <span className="text-2xl font-black tracking-tight">CodeQuest</span>
+              <span className="text-2xl font-bold tracking-tight">CodeQuest</span>
             </div>
             <p className="text-white/70 text-sm">University Coding Assessment Platform</p>
           </div>
 
           <div className="space-y-8">
             <div>
-              <h1 className="text-4xl font-black leading-tight mb-4">
+              <h1 className="text-4xl font-bold leading-tight mb-4">
                 Master Your<br />
                 <span className="text-white/90">Coding Skills</span>
               </h1>
@@ -103,11 +98,11 @@ const Login: React.FC = () => {
             <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
               <span className="material-symbols-outlined text-xl">code_blocks</span>
             </div>
-            <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white">CodeQuest</span>
+            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">CodeQuest</span>
           </div>
 
           <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-black text-slate-900 dark:text-white">Welcome back</h2>
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Welcome back</h2>
             <p className="text-slate-500 dark:text-slate-400 mt-2">Sign in to continue to your dashboard</p>
           </div>
 
@@ -158,8 +153,9 @@ const Login: React.FC = () => {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  <span className="material-symbols-outlined text-xl">
+                  <span className="material-symbols-outlined text-xl" aria-hidden="true">
                     {showPassword ? 'visibility_off' : 'visibility'}
                   </span>
                 </button>
@@ -179,7 +175,7 @@ const Login: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-lg shadow-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

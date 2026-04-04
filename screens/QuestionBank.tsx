@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 import { View, Question } from '../types';
+import { getDifficultyColor as getDifficultyColorUtil } from '../utils/formatters';
 
 interface Props {
   questions: Question[];
   onNavigate: (view: View) => void;
   onDeleteQuestion: (id: string) => void;
   onToggleVisibility: (id: string, visible: boolean) => void;
+  onEditQuestion?: (id: string) => void;
 }
 
-const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion, onToggleVisibility }) => {
+const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion, onToggleVisibility, onEditQuestion }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
   const [filterTopic, setFilterTopic] = useState<string>('all');
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [deleteModalId, setDeleteModalId] = useState<string | null>(null);
+  const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const topics = [...new Set(questions.map(q => q.topic))];
   
@@ -41,14 +44,7 @@ const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion
     );
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-      case 'medium': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'hard': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-      default: return 'bg-slate-100 text-slate-700';
-    }
-  };
+  const getDifficultyColor = (difficulty: string) => getDifficultyColorUtil(difficulty);
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-6">
@@ -61,13 +57,30 @@ const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion
           </p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              // Reset input so the same file can be re-selected
+              e.target.value = '';
+              // TODO: wire to an import handler prop when backend supports it
+              console.warn('Question import not yet implemented. File selected:', file.name);
+            }}
+          />
+          <button
+            onClick={() => importInputRef.current?.click()}
+            className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium"
+          >
             <span className="material-symbols-outlined text-lg">upload</span>
             Import
           </button>
           <button
             onClick={() => onNavigate('create-question')}
-            className="px-5 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
+            className="px-5 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-sm"
           >
             <span className="material-symbols-outlined text-lg">add</span>
             New Question
@@ -139,15 +152,24 @@ const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
               {selectedQuestions.length} selected
             </span>
-            <button className="text-sm font-medium text-primary hover:text-primary-dark flex items-center gap-1">
+            <button
+              onClick={() => { selectedQuestions.forEach(id => onToggleVisibility(id, true)); setSelectedQuestions([]); }}
+              className="text-sm font-medium text-primary hover:text-primary-dark flex items-center gap-1"
+            >
               <span className="material-symbols-outlined text-lg">visibility</span>
               Make Visible
             </button>
-            <button className="text-sm font-medium text-primary hover:text-primary-dark flex items-center gap-1">
+            <button
+              onClick={() => { selectedQuestions.forEach(id => onToggleVisibility(id, false)); setSelectedQuestions([]); }}
+              className="text-sm font-medium text-primary hover:text-primary-dark flex items-center gap-1"
+            >
               <span className="material-symbols-outlined text-lg">visibility_off</span>
               Hide
             </button>
-            <button className="text-sm font-medium text-red-500 hover:text-red-600 flex items-center gap-1">
+            <button
+              onClick={() => { selectedQuestions.forEach(id => onDeleteQuestion(id)); setSelectedQuestions([]); }}
+              className="text-sm font-medium text-red-500 hover:text-red-600 flex items-center gap-1"
+            >
               <span className="material-symbols-outlined text-lg">delete</span>
               Delete
             </button>
@@ -235,7 +257,7 @@ const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion
                         <span className="material-symbols-outlined text-lg">preview</span>
                       </button>
                       <button
-                        onClick={() => onNavigate('edit-question')}
+                        onClick={() => onEditQuestion ? onEditQuestion(question.id) : onNavigate('edit-question')}
                         className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-500 hover:text-primary"
                       >
                         <span className="material-symbols-outlined text-lg">edit</span>
@@ -268,7 +290,7 @@ const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion
           {filteredQuestions.map(question => (
             <div
               key={question.id}
-              className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-5 hover:shadow-lg transition-all group"
+              className="bg-white dark:bg-background-card rounded-xl border border-slate-200 dark:border-slate-800 p-5 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all group"
             >
               <div className="flex justify-between items-start mb-3">
                 <span className={`px-2.5 py-1 rounded-full text-xs font-bold capitalize ${getDifficultyColor(question.difficulty)}`}>
@@ -319,7 +341,7 @@ const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion
       {/* Delete Confirmation Modal */}
       {deleteModalId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-md w-full shadow-2xl">
+          <div className="bg-white dark:bg-background-card rounded-xl p-6 max-w-md w-full shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-2xl text-red-500">warning</span>

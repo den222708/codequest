@@ -16,6 +16,7 @@ import { Server as SocketIOServer, Socket, Namespace } from "socket.io";
 import type { Server as HttpServer } from "node:http";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import { createChildLogger } from "../lib/logger.js";
+import type { AppRole } from "../middleware/auth.js";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -114,6 +115,50 @@ async function flushEvents(): Promise<void> {
   }
 }
 
+// ── Socket.IO Auth Middleware ────────────────────────────────────────────
+
+interface SocketUser { id: string; email: string; role: AppRole; name: string }
+
+async function authenticateSocket(socket: Socket, next: (err?: Error) => void): Promise<void> {
+  const token = socket.handshake.auth?.token as string | undefined;
+  if (!token) {
+    return next(new Error("Authentication required"));
+  }
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) {
+      return next(new Error("Invalid or expired token"));
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, name")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile) {
+      return next(new Error("User profile not found"));
+    }
+
+    (socket as any).user = {
+      id: user.id,
+      email: user.email ?? "",
+      role: profile.role as AppRole,
+      name: profile.name ?? "",
+    } satisfies SocketUser;
+
+    next();
+  } catch {
+    next(new Error("Authentication failed"));
+  }
+}
+
+function getSocketUser(socket: Socket): SocketUser {
+  return (socket as any).user;
+}
+
 // ── Socket.IO Server Factory ────────────────────────────────────────────
 
 let io: SocketIOServer | null = null;
@@ -127,18 +172,24 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
     },
     pingInterval: 25_000,
     pingTimeout: 20_000,
-    transports: ["websocket", "polling"],
+    transports: ["websocket"],
   });
 
   // ── Proctoring Namespace (students) ───────────────────────────────────
   const proctoring = io.of("/proctoring") as unknown as Namespace<ClientToServerEvents, ServerToClientEvents>;
 
+  // Apply JWT auth middleware to proctoring namespace
+  (proctoring as any).use(authenticateSocket);
+
   proctoring.on("connection", (socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
-    log.debug({ socketId: socket.id }, "proctoring client connected");
+    const authedUser = getSocketUser(socket);
+    log.debug({ socketId: socket.id, userId: authedUser.id }, "proctoring client connected");
 
     // ── student:join ──────────────────────────────────────
     socket.on("student:join", (payload: StudentJoinPayload) => {
-      const { attemptId, assessmentId, studentId, studentName } = payload;
+      const { attemptId, assessmentId, studentName } = payload;
+      // Security: use authenticated user ID, not payload
+      const studentId = authedUser.id;
 
       const session: MonitoringSessionState = {
         socketId: socket.id,
@@ -285,8 +336,19 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
   // ── Admin Namespace ───────────────────────────────────────────────────
   const admin = io.of("/admin") as unknown as Namespace<AdminToServerEvents, ServerToAdminEvents>;
 
+  // Apply JWT auth middleware + role check to admin namespace
+  (admin as any).use(authenticateSocket);
+  (admin as any).use((socket: Socket, next: (err?: Error) => void) => {
+    const user = getSocketUser(socket);
+    if (user.role !== "teacher" && user.role !== "admin") {
+      return next(new Error("Insufficient permissions: teacher or admin role required"));
+    }
+    next();
+  });
+
   admin.on("connection", (socket: Socket<AdminToServerEvents, ServerToAdminEvents>) => {
-    log.debug({ socketId: socket.id }, "admin client connected");
+    const authedUser = getSocketUser(socket);
+    log.debug({ socketId: socket.id, userId: authedUser.id, role: authedUser.role }, "admin client connected");
 
     // ── monitor:subscribe ──────────────────────────────────
     socket.on("monitor:subscribe", ({ assessmentId }) => {

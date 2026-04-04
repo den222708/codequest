@@ -48,7 +48,7 @@ const AssessmentInstructions: React.FC<Props> = ({ onStart, onBack }) => {
         {/* Header */}
         <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-6">
           <div>
-            <h1 className="text-3xl font-black text-slate-900 dark:text-white">Instructions & System Check</h1>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Instructions & System Check</h1>
             <p className="text-slate-500 dark:text-slate-400 mt-1">{title} • {courseLine}</p>
           </div>
           <div className="w-12 h-12 bg-slate-200 dark:bg-slate-800 rounded-lg flex items-center justify-center text-primary">
@@ -176,7 +176,7 @@ const AssessmentInstructions: React.FC<Props> = ({ onStart, onBack }) => {
             <span className="material-symbols-outlined">arrow_back</span>
             Back to Dashboard
           </button>
-          <button onClick={handleEnterAssessment} className="w-full sm:w-auto px-8 py-3 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-lg shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+          <button onClick={handleEnterAssessment} className="w-full sm:w-auto px-8 py-3 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-lg shadow-sm transition-all flex items-center justify-center gap-2">
             Enter Assessment
             <span className="material-symbols-outlined">arrow_forward</span>
           </button>

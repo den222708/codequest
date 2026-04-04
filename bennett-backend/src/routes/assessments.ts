@@ -5,8 +5,11 @@ import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { cacheGet, cacheSet, cacheFlushPattern } from "../lib/cache.js";
 import { notifyAssessmentPublished } from "../services/notificationService.js";
+import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
+
+const log = createChildLogger({ module: "assessments" });
 
 const assessments = new Hono<AppEnv>();
 assessments.use("*", authMiddleware);
@@ -65,7 +68,10 @@ assessments.get("/", async (c) => {
       .from("class_enrollments")
       .select("class_id")
       .eq("student_id", user.id);
-    if (enrollErr) return sendError(c, 500, enrollErr.message);
+    if (enrollErr) {
+      log.error({ err: enrollErr, userId: user.id }, "Failed to fetch student enrollments");
+      return sendError(c, 500, "Failed to fetch assessments");
+    }
 
     const classIds = (enrollments ?? []).map((e) => e.class_id);
 
@@ -76,7 +82,10 @@ assessments.get("/", async (c) => {
         .from("assessment_assignments")
         .select("assessment_id")
         .in("class_id", classIds);
-      if (assignErr) return sendError(c, 500, assignErr.message);
+      if (assignErr) {
+        log.error({ err: assignErr, userId: user.id }, "Failed to fetch assessment assignments");
+        return sendError(c, 500, "Failed to fetch assessments");
+      }
       assignedIds = (assignments ?? []).map((a) => a.assessment_id);
     }
 
@@ -85,7 +94,10 @@ assessments.get("/", async (c) => {
       .from("assessments")
       .select("id")
       .eq("course_code", "DEMO-101");
-    if (demoErr) return sendError(c, 500, demoErr.message);
+    if (demoErr) {
+      log.error({ err: demoErr }, "Failed to fetch demo assessments");
+      return sendError(c, 500, "Failed to fetch assessments");
+    }
     const demoIds = (demoAssessments ?? []).map((d) => d.id);
 
     const visibleIds = [...new Set([...assignedIds, ...demoIds])];
@@ -107,7 +119,10 @@ assessments.get("/", async (c) => {
     query = query.order("created_at", { ascending: false });
 
     const { data, error } = await query;
-    if (error) return sendError(c, 500, error.message);
+    if (error) {
+      log.error({ err: error, userId: user.id }, "Failed to fetch student assessments");
+      return sendError(c, 500, "Failed to fetch assessments");
+    }
 
     const mapped = (data ?? []).map(mapAssessment);
     cacheSet(cacheKey, mapped, 120);
@@ -127,7 +142,10 @@ assessments.get("/", async (c) => {
   query = query.order("created_at", { ascending: false });
 
   const { data, error } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to fetch assessments");
+    return sendError(c, 500, "Failed to fetch assessments");
+  }
 
   const mapped = (data ?? []).map(mapAssessment);
   cacheSet(cacheKey, mapped, 120);
@@ -187,6 +205,23 @@ assessments.get("/:id", async (c) => {
   }
 
   const mapped = mapAssessment(data);
+
+  // Strip sensitive question fields for students
+  if (user.role === "student" && mapped.questions) {
+    mapped.questions = mapped.questions
+      .filter((q: any) => q.isVisible !== false)
+      .map((q: any) => {
+        const { solution, ...safe } = q;
+        // Hide expected output of hidden test cases
+        if (safe.testCases) {
+          safe.testCases = safe.testCases.map((tc: any) =>
+            tc.isHidden ? { ...tc, expectedOutput: "" } : tc
+          );
+        }
+        return safe;
+      });
+  }
+
   cacheSet(cacheKey, mapped, 300);
   return sendSuccess(c, mapped);
 });
@@ -223,14 +258,21 @@ assessments.post("/", requireRole("teacher", "admin"), async (c) => {
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to create assessment");
+    return sendError(c, 500, "Failed to create assessment");
+  }
 
-  // Link questions
+  // Link questions — fetch individual question points for correct scoring
+  const { data: qRows } = await supabase
+    .from("questions").select("id, points").in("id", d.questionIds);
+  const pointsMap = new Map((qRows ?? []).map((q: any) => [q.id, q.points ?? 10]));
+
   const questionLinks = d.questionIds.map((qId, idx) => ({
     assessment_id: assessment.id,
     question_id: qId,
     order: idx + 1,
-    points: 0,
+    points: pointsMap.get(qId) ?? 10,
   }));
 
   const { error: linkErr } = await supabase.from("assessment_questions").insert(questionLinks);
@@ -299,7 +341,10 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
       .select()
       .maybeSingle();
 
-    if (pubErr) return sendError(c, 500, pubErr.message);
+    if (pubErr) {
+      log.error({ err: pubErr, assessmentId: id }, "Failed to publish assessment");
+      return sendError(c, 500, "Failed to update assessment");
+    }
 
     if (transitioned) {
       wasPublished = true;
@@ -310,12 +355,18 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
       if (Object.keys(nonStatusUpdates).length > 0) {
         const { data: d2, error: e2 } = await supabase
           .from("assessments").update(nonStatusUpdates).eq("id", id).select().single();
-        if (e2) return sendError(c, 500, e2.message);
+        if (e2) {
+          log.error({ err: e2, assessmentId: id }, "Failed to update assessment after publish");
+          return sendError(c, 500, "Failed to update assessment");
+        }
         data = d2;
       } else {
         const { data: d2, error: e2 } = await supabase
           .from("assessments").select().eq("id", id).single();
-        if (e2) return sendError(c, 500, e2.message);
+        if (e2) {
+          log.error({ err: e2, assessmentId: id }, "Failed to fetch assessment after publish");
+          return sendError(c, 500, "Failed to fetch assessment");
+        }
         data = d2;
       }
     }
@@ -326,18 +377,26 @@ assessments.put("/:id", requireRole("teacher", "admin"), async (c) => {
       .eq("id", id)
       .select()
       .single();
-    if (error) return sendError(c, 500, error.message);
+    if (error) {
+      log.error({ err: error, assessmentId: id }, "Failed to update assessment");
+      return sendError(c, 500, "Failed to update assessment");
+    }
     data = d2;
   }
 
   // Update question links if provided
   if (d.questionIds && d.questionIds.length > 0) {
     await supabase.from("assessment_questions").delete().eq("assessment_id", id);
+    // Fetch individual question points for correct scoring
+    const { data: qRows } = await supabase
+      .from("questions").select("id, points").in("id", d.questionIds);
+    const pointsMap = new Map((qRows ?? []).map((q: any) => [q.id, q.points ?? 10]));
+
     const questionLinks = d.questionIds.map((qId, idx) => ({
       assessment_id: id,
       question_id: qId,
       order: idx + 1,
-      points: 0,
+      points: pointsMap.get(qId) ?? 10,
     }));
     await supabase.from("assessment_questions").insert(questionLinks);
   }
@@ -372,7 +431,10 @@ assessments.delete("/:id", requireRole("teacher", "admin"), async (c) => {
 
   await supabase.from("assessment_questions").delete().eq("assessment_id", id);
   const { error } = await supabase.from("assessments").delete().eq("id", id);
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, assessmentId: id }, "Failed to delete assessment");
+    return sendError(c, 500, "Failed to delete assessment");
+  }
 
   cacheFlushPattern("assessments:");
   return sendSuccess(c, { message: "Assessment deleted" });
@@ -413,7 +475,10 @@ assessments.post("/:id/clone", requireRole("teacher", "admin"), async (c) => {
     .select()
     .single();
 
-  if (cloneErr) return sendError(c, 500, cloneErr.message);
+  if (cloneErr) {
+    log.error({ err: cloneErr, assessmentId: id }, "Failed to clone assessment");
+    return sendError(c, 500, "Failed to clone assessment");
+  }
 
   // Clone question links
   if (original.assessment_questions?.length) {
@@ -450,6 +515,15 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
     return sendError(c, 400, "Assessment is not available");
   }
 
+  // Enforce IP restriction if enabled
+  const assessmentSettings = assessment.settings ?? {};
+  if (assessmentSettings.ipRestriction && assessmentSettings.allowedIPs?.length > 0) {
+    const clientIp = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || c.req.header("x-real-ip") || "unknown";
+    if (!assessmentSettings.allowedIPs.includes(clientIp)) {
+      return sendError(c, 403, "Access denied: your IP address is not authorized for this assessment");
+    }
+  }
+
   // Verify student has access: enrolled in a class with this assessment, or demo
   // Per-user client for RLS-scoped enrollment reads
   const isDemo = assessment.course_code === "DEMO-101";
@@ -458,7 +532,10 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
       .from("class_enrollments")
       .select("class_id")
       .eq("student_id", user.id);
-    if (enrollErr) return sendError(c, 500, enrollErr.message);
+    if (enrollErr) {
+      log.error({ err: enrollErr, userId: user.id }, "Failed to fetch enrollments for attempt");
+      return sendError(c, 500, "Failed to create assessment attempt");
+    }
     const classIds = (enrollments ?? []).map((e) => e.class_id);
 
     if (classIds.length === 0) {
@@ -472,7 +549,10 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
       .in("class_id", classIds)
       .limit(1)
       .maybeSingle();
-    if (assignErr) return sendError(c, 500, assignErr.message);
+    if (assignErr) {
+      log.error({ err: assignErr, userId: user.id, assessmentId }, "Failed to check assessment assignment");
+      return sendError(c, 500, "Failed to create assessment attempt");
+    }
 
     if (!assignment) {
       return sendError(c, 403, "This assessment is not assigned to your class");
@@ -485,7 +565,10 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
     .select("*", { count: "exact", head: true })
     .eq("assessment_id", assessmentId)
     .eq("student_id", user.id);
-  if (countErr) return sendError(c, 500, countErr.message);
+  if (countErr) {
+    log.error({ err: countErr, userId: user.id, assessmentId }, "Failed to count assessment attempts");
+    return sendError(c, 500, "Failed to create assessment attempt");
+  }
 
   const maxAttempts = assessment.settings?.maxAttempts ?? 1;
   if ((count ?? 0) >= maxAttempts) {
@@ -505,7 +588,10 @@ assessments.post("/:id/attempts", requireRole("student"), async (c) => {
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, userId: user.id, assessmentId }, "Failed to create assessment attempt");
+    return sendError(c, 500, "Failed to create assessment attempt");
+  }
 
   return sendSuccess(c, {
     id: attempt.id,

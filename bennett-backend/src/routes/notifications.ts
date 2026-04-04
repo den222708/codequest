@@ -2,8 +2,11 @@ import { Hono } from "hono";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
+
+const log = createChildLogger({ module: "notifications" });
 
 const notifications = new Hono<AppEnv>();
 notifications.use("*", authMiddleware);
@@ -27,7 +30,10 @@ notifications.get("/", async (c) => {
   }
 
   const { data, error } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, userId: user.id }, "Failed to fetch notifications");
+    return sendError(c, 500, "Failed to fetch notifications");
+  }
 
   return sendSuccess(c, (data ?? []).map((n) => ({
     id: n.id,
@@ -51,7 +57,10 @@ notifications.get("/unread-count", async (c) => {
     .eq("user_id", user.id)
     .eq("is_read", false);
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, userId: user.id }, "Failed to fetch unread notification count");
+    return sendError(c, 500, "Failed to fetch notification count");
+  }
   return sendSuccess(c, { count: count ?? 0 });
 });
 
@@ -67,7 +76,10 @@ notifications.put("/:id/read", async (c) => {
     .eq("id", id)
     .eq("user_id", user.id);
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, notificationId: id, userId: user.id }, "Failed to mark notification as read");
+    return sendError(c, 500, "Failed to process notification");
+  }
   return sendSuccess(c, { message: "Notification marked as read" });
 });
 
@@ -82,7 +94,10 @@ notifications.put("/read-all", async (c) => {
     .eq("user_id", user.id)
     .eq("is_read", false);
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, userId: user.id }, "Failed to mark all notifications as read");
+    return sendError(c, 500, "Failed to process notification");
+  }
   return sendSuccess(c, { message: "All notifications marked as read" });
 });
 
@@ -98,7 +113,10 @@ notifications.delete("/:id", async (c) => {
     .eq("id", id)
     .eq("user_id", user.id);
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, notificationId: id, userId: user.id }, "Failed to delete notification");
+    return sendError(c, 500, "Failed to process notification");
+  }
   return sendSuccess(c, { message: "Notification deleted" });
 });
 
@@ -112,7 +130,10 @@ notifications.delete("/", async (c) => {
     .delete()
     .eq("user_id", user.id);
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, userId: user.id }, "Failed to clear all notifications");
+    return sendError(c, 500, "Failed to process notification");
+  }
   return sendSuccess(c, { message: "All notifications cleared" });
 });
 

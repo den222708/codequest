@@ -1,1518 +1,472 @@
-# UI/UX Mockup Document
+# CodeQuest UI/UX Specification
 
-## CodeQuest: University Coding Assessment Platform
+## University Coding Assessment Platform
 
-**Version:** 1.0  
-**Last Updated:** January 11, 2026  
-**Design Tool:** Figma (recommended)  
-**Status:** High-Fidelity Mockups - Ready for Development
+**Version:** 2.1
+**Last Updated:** 2026-03-20T22:00:00Z
+**Status:** Reflects actual implementation as of this date (post-55-item hardening plan)
 
 ---
 
 ## Table of Contents
 
-1. [Design System Overview](#1-design-system-overview)
+1. [Design System](#1-design-system)
 2. [Color Palette & Typography](#2-color-palette--typography)
-3. [Component Library](#3-component-library)
-4. [User Flows & Wireframes](#4-user-flows--wireframes)
-5. [Screen Specifications](#5-screen-specifications)
-6. [Responsive Design Guidelines](#6-responsive-design-guidelines)
-7. [Accessibility Standards](#7-accessibility-standards)
-8. [Design Patterns](#8-design-patterns)
-9. [Animation & Interactions](#9-animation--interactions)
-10. [Design Tokens](#10-design-tokens)
+3. [Component Inventory](#3-component-inventory)
+4. [Screen Inventory](#4-screen-inventory)
+5. [Route Structure & Navigation](#5-route-structure--navigation)
+6. [Layout System](#6-layout-system)
+7. [Design Conventions](#7-design-conventions)
+8. [Accessibility](#8-accessibility)
+9. [Responsive Design](#9-responsive-design)
+10. [Dark Mode](#10-dark-mode)
 
 ---
 
-## 1. Design System Overview
+## 1. Design System
 
 ### 1.1 Design Philosophy
 
-**Core Principles:**
-- **Clarity:** Simple, intuitive interfaces for coding assessments
-- **Efficiency:** Minimize friction between student action and code execution
-- **Accessibility:** WCAG 2.1 AA compliant for all users
-- **Consistency:** Unified visual language across all roles
-- **Feedback:** Real-time, meaningful feedback on code submissions
+- **Professional clarity** over decorative flair — no gradients on hero sections, no glassmorphism, no animated backgrounds
+- **Flat, solid colors** with subtle elevation via `shadow-sm` on cards and `shadow-xl` max on modals
+- **Scoped transitions** on interactive elements only (buttons, inputs, links) — no global `*` transition rules
+- **Material Symbols Outlined** icon set (Google) — variable weight/fill, no emoji, no Font Awesome
+- **Manrope** for all UI text, **JetBrains Mono** for code — no Inter, no system fonts
 
-### 1.2 Design Goals
+### 1.2 Technology Stack
 
-- Create a **professional, educational** atmosphere (not entertainment-focused)
-- Support **focused coding sessions** with minimal distractions
-- Provide **clear visual hierarchy** for problem statements and code editor
-- Enable **quick navigation** between assessments and questions
-- Display **meaningful feedback** on test results
+| Layer | Technology |
+|---|---|
+| CSS Framework | Tailwind CSS (CDN, runtime JIT) |
+| Icon Set | Material Symbols Outlined (variable font) |
+| UI Font | Manrope (300–800 weights) |
+| Code Font | JetBrains Mono (400–600 weights), Fira Code fallback |
+| Code Editor | Monaco Editor via `@monaco-editor/react` |
+| Charts | Recharts |
+| Dark Mode | Tailwind `class` strategy, toggled via Layout |
 
 ---
 
 ## 2. Color Palette & Typography
 
-### 2.1 Color System
-
-#### Primary Colors
-
-| Color | Hex | Usage | Contrast Ratio |
-|-------|-----|-------|----------------|
-| **Teal (Primary)** | #208090 | Buttons, links, highlights | 7.2:1 ✓ |
-| **Teal Light** | #32B8C6 | Hover states, backgrounds | 6.1:1 ✓ |
-| **Teal Dark** | #1A6873 | Active states, depth | 8.9:1 ✓ |
-
-#### Semantic Colors
-
-| Intent | Light Mode | Dark Mode | Usage |
-|--------|-----------|----------|-------|
-| **Success** | #22C55E | #4ADE80 | Passing tests, confirmations |
-| **Error** | #C01530 | #FF5459 | Failed tests, errors |
-| **Warning** | #A84B2F | #E6815F | Warnings, caution states |
-| **Info** | #627C85 | #A7A9A9 | Informational messages |
-
-#### Neutral Colors (Light Mode)
-
-| Shade | Hex | Usage |
-|-------|-----|-------|
-| **White** | #FFFCF9 | Primary backgrounds |
-| **Light Gray** | #F5F5F5 | Secondary backgrounds |
-| **Medium Gray** | #A7A9A9 | Text secondary |
-| **Dark Gray** | #1F2121 | Text primary |
-
-#### Neutral Colors (Dark Mode)
-
-| Shade | Hex | Usage |
-|-------|-----|-------|
-| **Dark BG** | #1F2121 | Primary backgrounds |
-| **Card BG** | #262828 | Secondary backgrounds |
-| **Light Gray** | #A7A9A9 | Text secondary |
-| **White** | #F5F5F5 | Text primary |
-
-### 2.2 Typography System
-
-#### Font Family
-
-- **Primary Font:** Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
-- **Code Font:** "Courier New", Courier, monospace (for code editor)
-- **Fallback Stack:** Ensures cross-platform consistency
-
-#### Type Scale
-
-| Level | Size | Weight | Line Height | Usage |
-|-------|------|--------|------------|-------|
-| **H1** | 30px | 600 (Semibold) | 1.2 | Page titles |
-| **H2** | 24px | 600 (Semibold) | 1.2 | Section headers |
-| **H3** | 20px | 600 (Semibold) | 1.2 | Subsection headers |
-| **H4** | 18px | 500 (Medium) | 1.3 | Small headers |
-| **Body Large** | 16px | 400 (Regular) | 1.5 | Primary content |
-| **Body Regular** | 14px | 400 (Regular) | 1.5 | Standard text |
-| **Body Small** | 12px | 400 (Regular) | 1.4 | Secondary text, labels |
-| **Code** | 13px | 400 (Regular) | 1.6 | Code blocks |
-| **Caption** | 11px | 400 (Regular) | 1.4 | Meta information |
-
-#### Line Length
-
-- **Optimal:** 50-75 characters per line
-- **Maximum:** 120 characters per line
-- **Code Editor:** Configurable, typically 100 characters
-
----
-
-## 3. Component Library
-
-### 3.1 Buttons
-
-#### Button Variants
-
-**Primary Button**
-```
-State      | Background | Text     | Border
------------|-----------|----------|--------
-Default    | #208090   | White    | None
-Hover      | #1A6873   | White    | None
-Active     | #166575   | White    | None
-Disabled   | #A7A9A9   | #627C85  | None
-Focus      | #208090   | White    | 3px teal outline
-```
-
-**Secondary Button**
-```
-State      | Background | Text     | Border
------------|-----------|----------|--------
-Default    | #F5F5F5   | #1F2121  | 1px #A7A9A9
-Hover      | #E8E8E8   | #1F2121  | 1px #627C85
-Active     | #D0D0D0   | #1F2121  | 1px #627C85
-Disabled   | #F5F5F5   | #A7A9A9  | 1px #D0D0D0
-```
-
-**Danger Button**
-```
-State      | Background | Text     | Border
------------|-----------|----------|--------
-Default    | #C01530   | White    | None
-Hover      | #A01225   | White    | None
-Active     | #801020   | White    | None
-Disabled   | #D4B5BA   | #F5F5F5  | None
-```
-
-**Button Sizes**
-- **Small (sm):** 32px height, 8px vertical padding, 12px horizontal padding
-- **Medium (md):** 40px height, 10px vertical padding, 16px horizontal padding
-- **Large (lg):** 48px height, 12px vertical padding, 20px horizontal padding
-
-**Button Spacing**
-- Icon + Text: 8px gap
-- Button Groups: 8px gap between buttons
-- Button + Text: 16px margin above/below
-
-### 3.2 Form Elements
-
-#### Input Fields
-
-**States:**
-- **Default:** 1px border #A7A9A9, 8px padding, 6px border-radius
-- **Focused:** 2px solid border #208090, 3px teal outline
-- **Error:** 1px solid border #C01530, error icon, error message below
-- **Disabled:** Background #F5F5F5, border #D0D0D0, cursor not-allowed
-- **Filled/Readonly:** Background #F5F5F5, border #D0D0D0
-
-**Input Height:** 40px (standard), 48px (large)
-
-**Placeholder Text:** #A7A9A9, italic, opacity 0.7
-
-#### Labels
-
-**Format:**
-- **Weight:** 500 (Medium)
-- **Size:** 12px
-- **Color:** #1F2121
-- **Margin Bottom:** 8px
-- **Required Indicator:** Asterisk (*) in #C01530, to the right of label
-
-#### Validation Messages
-
-**Error Message:**
-- **Color:** #C01530
-- **Icon:** ✕ symbol or alert icon
-- **Size:** 12px
-- **Margin Top:** 4px
-
-**Success Message:**
-- **Color:** #22C55E
-- **Icon:** ✓ symbol
-- **Size:** 12px
-- **Margin Top:** 4px
-
-#### Text Area
-
-- **Default Height:** 120px, expandable
-- **Max Height:** 400px
-- **Font:** 14px monospace for code input
-- **Padding:** 12px
-- **Border:** 1px solid #A7A9A9
-
-#### Select/Dropdown
-
-- **Height:** 40px
-- **Padding:** 10px 12px
-- **Border:** 1px solid #A7A9A9
-- **Caret:** Positioned right 12px, size 16px
-- **Hover:** Border color changes to #627C85
-- **Open State:** Border #208090, outline 3px teal
-
-### 3.3 Cards
-
-#### Card Component
-
-**Structure:**
-```
-┌─────────────────────────────┐
-│  Card Header (Optional)     │  ← 16px padding, border-bottom
-├─────────────────────────────┤
-│                             │
-│      Card Body (Content)    │  ← 16px padding
-│                             │
-├─────────────────────────────┤
-│  Card Footer (Optional)     │  ← 16px padding, border-top
-└─────────────────────────────┘
-```
-
-**Specifications:**
-- **Border:** 1px solid #D0D0D0
-- **Border Radius:** 8px
-- **Background:** White (#FFFCF9)
-- **Box Shadow:** 0 1px 3px rgba(0,0,0,0.08)
-- **Hover Shadow:** 0 4px 6px rgba(0,0,0,0.12)
-- **Padding:** 16px (body), 12px (header/footer)
-
-#### Card Variants
-
-**Outlined Card:**
-- Border: 2px solid #208090
-- Background: #FFFCF9
-- Shadow: None
-
-**Elevated Card:**
-- Shadow: 0 4px 6px rgba(0,0,0,0.12)
-- Border: None
-- Background: White
-
-**Filled Card:**
-- Background: #F5F5F5
-- Border: None
-- Shadow: None
-
-### 3.4 Badges & Status Indicators
-
-#### Badge Component
-
-**Styles:**
-```
-Success    | Background: #F0FDF4  | Text: #22C55E | Border: 1px #C6E9C9
-Error      | Background: #FEF2F2  | Text: #C01530 | Border: 1px #F5D9DD
-Warning    | Background: #FFF7ED  | Text: #A84B2F | Border: 1px #FEDD9D
-Info       | Background: #F0F4F8  | Text: #627C85 | Border: 1px #D0DFE9
-```
-
-**Sizes:**
-- **Small:** 20px height, 6px padding, 4px border-radius, 12px font
-- **Medium:** 24px height, 8px padding, 6px border-radius, 14px font
-
-#### Status Indicator
-
-**Dot + Label Format:**
-- Dot: 8px diameter, inline
-- Label: 12px, 8px gap from dot
-- Example: ● Passed, ● Failed, ● In Progress
-
-### 3.5 Navigation Components
-
-#### Top Navigation Bar
-
-**Height:** 64px
-
-**Layout:**
-```
-┌────────────────────────────────────────────────────────────┐
-│ [Logo] [Breadcrumb]       [Search] [Notifications] [Avatar]│
-└────────────────────────────────────────────────────────────┘
-```
-
-**Specifications:**
-- **Background:** White (#FFFCF9)
-- **Border-Bottom:** 1px solid #D0D0D0
-- **Box Shadow:** 0 1px 3px rgba(0,0,0,0.08)
-- **Logo Size:** 32px height
-- **Padding:** 12px 24px
-
-#### Sidebar Navigation
-
-**Width:**
-- **Desktop:** 260px (expanded), 80px (collapsed)
-- **Tablet:** Drawer (hidden by default)
-- **Mobile:** Bottom navigation bar or side drawer
-
-**Menu Item Height:** 48px
-
-**Submenu Indent:** 16px
-
-**Active State:** 
-- Left border: 4px solid #208090
-- Background: #F0F8FA
-- Font weight: 600
-
-#### Breadcrumb
-
-**Format:** Home > Dashboard > Assessments > Assessment Name
-
-**Styling:**
-- **Separator:** "/" or ">" icon, color #A7A9A9
-- **Active (Last):** Color #1F2121, weight 500
-- **Inactive:** Color #627C85, weight 400, underline on hover
-- **Size:** 12px
-
-### 3.6 Tables
-
-#### Table Structure
-
-```
-┌──────┬─────────────────┬──────────┬──────────┐
-│ Chk  │ Name            │ Status   │ Action   │
-├──────┼─────────────────┼──────────┼──────────┤
-│ [ ]  │ Problem 1       │ ✓ Passed │ [View]   │
-├──────┼─────────────────┼──────────┼──────────┤
-│ [ ]  │ Problem 2       │ ✕ Failed │ [View]   │
-└──────┴─────────────────┴──────────┴──────────┘
-```
-
-**Specifications:**
-- **Header Background:** #F5F5F5
-- **Header Font:** 12px, weight 600, color #627C85
-- **Row Height:** 56px
-- **Border:** 1px solid #D0D0D0 (between rows)
-- **Padding:** 12px per cell
-- **Alternating Rows:** None (maintain white background for clarity)
-
-**Hover State:**
-- **Background:** #F9FAFB
-- **Cursor:** Pointer
-- **Subtle shadow:** 0 1px 2px rgba(0,0,0,0.04)
-
-### 3.7 Modal/Dialog
-
-#### Modal Structure
-
-```
-┌─────────────────────────────────────────────┐
-│ Modal Title                          [✕]    │  ← Header
-├─────────────────────────────────────────────┤
-│                                             │
-│              Modal Content                  │  ← Body (scrollable)
-│                                             │
-├─────────────────────────────────────────────┤
-│  [Cancel]                        [Confirm]  │  ← Footer
-└─────────────────────────────────────────────┘
-```
-
-**Specifications:**
-- **Width:** 90% (mobile), 600px (tablet), 720px (desktop)
-- **Max Height:** 90vh
-- **Border Radius:** 8px
-- **Background:** White (#FFFCF9)
-- **Backdrop:** Solid black, opacity 0.5
-- **Header Padding:** 20px
-- **Body Padding:** 20px
-- **Footer Padding:** 16px, border-top 1px #D0D0D0
-- **Box Shadow:** 0 10px 25px rgba(0,0,0,0.2)
-
-#### Close Button
-- **Position:** Top-right corner
-- **Icon:** ✕ (X) symbol
-- **Size:** 24px
-- **Color:** #627C85
-- **Hover Color:** #1F2121
-
----
-
-## 4. User Flows & Wireframes
-
-### 4.1 Student User Flow
-
-#### Flow: Attempt Assessment
-
-```
-┌─────────────────────┐
-│   Student Login     │
-└──────────┬──────────┘
-           │
-    ┌──────▼──────┐
-    │  Dashboard  │
-    └──────┬──────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  View Available Assessments │
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────┐
-    │  Click "Start"      │
-    └──────┬──────────────┘
-           │
-    ┌──────▼────────────────────────┐
-    │  Assessment Instructions      │
-    │  (Duration, rules, etc.)      │
-    └──────┬────────────────────────┘
-           │
-    ┌──────▼──────────────┐
-    │  Problem #1         │
-    │  (Code Editor)      │
-    └──────┬──────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  Run Code / Submit          │  ─→ [Real-time Feedback]
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────┐
-    │  Next Problem       │
-    └──────┬──────────────┘
-           │
-    ┌──────▼──────────────┐
-    │  Review & Submit    │
-    └──────┬──────────────┘
-           │
-    ┌──────▼──────────────┐
-    │  Results Page       │
-    │  (Score, Feedback)  │
-    └─────────────────────┘
-```
-
-#### Key Decision Points
-- **Can Re-attempt?** Yes/No (Professor defined)
-- **Show Answers?** Yes/No (Professor defined)
-- **Skip Problem?** Yes (for later)
-
----
-
-### 4.2 Professor User Flow
-
-#### Flow: Create Assessment
-
-```
-┌─────────────────────┐
-│  Professor Login    │
-└──────────┬──────────┘
-           │
-    ┌──────▼──────┐
-    │  Dashboard  │
-    └──────┬──────┘
-           │
-    ┌──────▼────────────────────┐
-    │ Click "Create Assessment" │
-    └──────┬────────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  Assessment Details         │
-    │  (Name, duration, type)     │
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  Select/Create Questions    │
-    │  (From bank or new)         │
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  Configure Settings         │
-    │  (Scoring, retakes, etc.)   │
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  Set Date/Time & Publish    │
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  Monitor Submissions        │
-    │  (Real-time updates)        │
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  View Analytics/Grade       │
-    └─────────────────────────────┘
-```
-
----
-
-### 4.3 Admin User Flow
-
-#### Flow: User Management
-
-```
-┌─────────────────────┐
-│   Admin Login       │
-└──────────┬──────────┘
-           │
-    ┌──────▼──────┐
-    │  Dashboard  │
-    └──────┬──────┘
-           │
-    ┌──────▼──────────────────┐
-    │ Click "User Management" │
-    └──────┬──────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  User List (Searchable)     │
-    └──────┬──────────────────────┘
-           │
-    ┌─────────────────────────────┐
-    │ [Create] [Edit] [Deactivate]│
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  User Details Form          │
-    │  (Email, Role, Status)      │
-    └──────┬──────────────────────┘
-           │
-    ┌──────▼──────────────────────┐
-    │  Save / Confirm             │
-    └─────────────────────────────┘
-```
-
----
-
-## 5. Screen Specifications
-
-### 5.1 Student Dashboard
-
-**Layout: Main Content + Right Sidebar**
-
-```
-┌────────────────────────────────────────────────────────┐
-│ CodeQuest Logo    Breadcrumb    Search  [Notifications]│
-├──────────────────────────────────┬─────────────────────┤
-│                                  │                     │
-│  Welcome, Arjun! 👋              │  Quick Stats:       │
-│                                  │    ─────────────────│
-│  My Assessments                  │  • Tests: 12        │
-│  ────────────────────────────────│  • Pass Rate: 83%   │
-│  ┌──────────────────────────────┐│  • Score Avg: 85    │
-│  │ Assessment 1                 ││                     │
-│  │ Due: 2 days                  ││  Recent Activity:   │
-│  │ Status: Available  [Start]   ││  ─────────────────  │
-│  └──────────────────────────────┘│  ✓ Passed Quiz 1   │
-│                                  │  ✓ Attempted Q2     │
-│  ┌──────────────────────────────┐│  ✕ Failed Q3        │
-│  │ Assessment 2                 ││                    │
-│  │ Due: 5 days                  ││                    │
-│  │ Status: In Progress  [View]  ││                    │
-│  └──────────────────────────────┘│                    │
-│                                  │                    │
-│  ┌──────────────────────────────┐│                    │
-│  │ Score Progression            ││                    │
-│  │ [Line Chart]                 ││                    │
-│  └──────────────────────────────┘│                    │
-└──────────────────────────────────┴────────────────────┘
-```
-
-**Key Elements:**
-- **Welcome Header:** With user's name
-- **Assessment Cards:** Title, due date, status badge, action button
-- **Performance Chart:** Score over time (line chart)
-- **Stats Sidebar:** Key metrics (read-only)
-- **Activity Feed:** Recent submissions
-
-**Responsive Behavior:**
-- **Mobile:** Stack cards vertically, move stats to top, remove chart
-- **Tablet:** 2-column layout, stats below assessments
-- **Desktop:** 3-column layout (assessments, main content, stats)
-
----
-
-### 5.2 Attempt Problem Screen
-
-**Layout: Problem Left + Code Editor Right**
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ CodeQuest      Assessment: Data Structures Quiz    [Menu]│
-├──────────────┬───────────────────────────────────────────┤
-│              │                                           │
-│ Problem 1/3  │ Problem: Two Sum                          │
-│ Title        │ ───────────────────────────────────────── │
-│              │ Given an array of integers nums and an    │
-│              │ integer target, return the indices of the │
-│ □ Problem 1  │ two numbers such that they add up to      │
-│ □ Problem 2  │ target.                                   │
-│ □ Problem 3  │                                           │
-│              │ Example:                                  │
-│ [Bookmark]   │ Input: nums = [2,7,11,15], target = 9     │
-│              │ Output: [0,1]                             │
-│              │                                           │
-│ ✓ Completed  │ Constraints:                              │
-│              │ • 2 <= nums.length <= 10^4                │
-│              │ • 10^9 <= nums[i] <= 10^9                 │
-│              │                                           │
-│ ────────────┘────────────────────────────────────────────┤
-│ Test Cases                                               │
-│ ─────────────────────────────────────────────────────────┤
-│ Example 1:                                               │
-│ Input: nums = [2,7,11,15], target = 9                    │
-│ Output: [0,1]                                            │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Code Editor Section:**
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ Python  ▼ |  Theme: Light ▼  |  [+] [-]  |  Copy         │
-├──────────────────────────────────────────────────────────┤
-│  1 │ def twoSum(nums, target):                           │
-│  2 │     # Write your solution here                      │
-│  3 │     pass                                            │
-│  4 │                                                     │
-│  5 │                                                     │
-├──────────────────────────────────────────────────────────┤
-│ [Run Code] [Submit] [Save Draft] [Reset]                 │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Output Section (After Run):**
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ Test Results                                             │
-├──────────────────────────────────────────────────────────┤
-│ ✓ Test Case 1: PASSED                                    │
-│   Input: [2,7,11,15], 9                                  │
-│   Expected: [0,1]                                        │
-│   Got: [0,1]                                             │
-│   Time: 0.12ms  Memory: 2.5MB                            │
-│                                                          │
-│ ✓ Test Case 2: PASSED                                    │
-│   Input: [3,2,4], 6                                      │
-│   Expected: [1,2]                                        │
-│   Got: [1,2]                                             │
-│   Time: 0.15ms  Memory: 2.3MB                            │
-│                                                          │
-│ ✕ Test Case 3: FAILED                                    │
-│   Input: [3,3], 6                                        │
-│   Expected: [0,1]                                        │
-│   Got: None                                              │
-│   Error: NoneType cannot be indexed                      │
-│                                                          │
-│ Score: 66.7% (2/3 passed)                                │
-│ Time Limit: ✓ Within limit (max 2s)                      │
-│ Memory Limit: ✓ Within limit (max 256MB)                 │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Responsive Behavior:**
-- **Mobile:** Stack vertically (problem top, editor below, output below)
-- **Tablet:** 2-row layout (problem top, editor + output below)
-- **Desktop:** 2-column layout (problem left, editor + output right)
-
----
-
-### 5.3 Assessment Results Page
-
-**Layout: Centered Content**
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ CodeQuest       Data Structures Quiz           [Menu]    │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│                   Assessment Completed ✓                 │
-│                                                          │
-│  Score: 78/100 (78%)                                     │
-│  ────────────────────────────────────────────────────────│
-│  [████████░░] 78%                                        │
-│                                                          │
-│  Time Spent: 45 minutes / 60 minutes available           │
-│  Submitted: Jan 11, 2026 at 3:15 PM                      │
-│                                                          │
-│                   Problem Results                        │
-│  ────────────────────────────────────────────────────────│
-│  ┌───────────────────────────────────────────────────┐   │
-│  │ # │ Title         │ Status │ Score │ Action       │   │
-│  ├───┼───────────────┼────────┼───────┼──────────────┤   │
-│  │ 1 │ Two Sum       │ ✓      │ 100%  │ [View Code]  │   │
-│  │ 2 │ Reverse Array │ ✓      │ 75%   │ [View Code]  │   │
-│  │ 3 │ Merge Arrays  │ ✕      │ 0%    │ [View Code]  │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                          │
-│  [⬅ Back]                    [View Detailed Feedback]    │
-│                              [Download PDF Result]       │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Detailed Feedback Modal:**
-
-```
-┌──────────────────────────────────────────────────────┐
-│ Problem #2: Reverse Array  (75%)          [✕]        │
-├──────────────────────────────────────────────────────┤
-│                                                       │
-│ Your Score: 75/100                                   │
-│                                                       │
-│ Results:                                              │
-│ • Passed 3/4 test cases                              │
-│ • Time: 120ms (within 2s limit)                      │
-│ • Memory: 15MB (within 256MB limit)                  │
-│                                                       │
-│ Failed Test Case:                                    │
-│ Input: [1,2,3,4,5]                                  │
-│ Expected: [5,4,3,2,1]                               │
-│ Got: [5,4,3,2,0]  ← Wrong last element             │
-│                                                       │
-│ Your Code:                                            │
-│ ───────────────────────────────────────────────────  │
-│ def reverse(arr):                                    │
-│     return arr[::-1]  # ← Missing proper handling   │
-│                                                       │
-│ Feedback:                                             │
-│ Good approach! Consider edge cases where the last   │
-│ element might be zero.                               │
-│                                                       │
-│ [Close]                                              │
-└──────────────────────────────────────────────────────┘
-```
-
----
-
-### 5.4 Professor: Create Assessment
-
-**Layout: Multi-step Form**
-
-```
-┌──────────────────────────────────────────────────────┐
-│ CodeQuest    Create Assessment         [Draft Saved] │
-├──────────────────────────────────────────────────────┤
-│                                                      │
-│ Step 1: Assessment Details                          │
-│ ─────────────────────────────────────────────────   │
-│                                                      │
-│ Assessment Name *                                   │
-│ [____________________________________]              │
-│                                                      │
-│ Description                                          │
-│ [________________________                            │
-│  ___________________________________]                │
-│                                                      │
-│ Assessment Type *       Difficulty *                │
-│ [Quiz ▼]               [Easy ▼]                    │
-│                                                      │
-│ Duration (minutes) *    Passing Score (%) *        │
-│ [120]                  [70]                         │
-│                                                      │
-│ ─────────────────────────────────────────────────   │
-│ [◀ Cancel]  [Next: Add Questions ▶]                │
-└──────────────────────────────────────────────────────┘
-```
-
-**Step 2: Add Questions**
-
-```
-┌──────────────────────────────────────────────────────┐
-│ Step 2: Add Questions                               │
-│ ─────────────────────────────────────────────────── │
-│                                                      │
-│ Search Question Bank:                               │
-│ [________________________] [🔍 Search]             │
-│ [Filter by: Difficulty ▼] [Topic ▼]               │
-│                                                      │
-│ Available Questions:                                 │
-│ ┌──────────────────────────────────────────────┐   │
-│ │ ☑ Two Sum (Easy) - 50 points                │   │
-│ ├──────────────────────────────────────────────┤   │
-│ │ ☑ Merge Arrays (Medium) - 75 points         │   │
-│ ├──────────────────────────────────────────────┤   │
-│ │ ☐ Graph DFS (Hard) - 100 points             │   │
-│ └──────────────────────────────────────────────┘   │
-│                                                      │
-│ Selected Questions: 2                                │
-│ Total Points: 125                                    │
-│                                                      │
-│ [+ Create New Question]                             │
-│                                                      │
-│ ─────────────────────────────────────────────────   │
-│ [◀ Back]  [Next: Configure Settings ▶]            │
-└──────────────────────────────────────────────────────┘
-```
-
-**Step 3: Settings & Publish**
-
-```
-┌──────────────────────────────────────────────────────┐
-│ Step 3: Settings & Publish                           │
-│ ─────────────────────────────────────────────────── │
-│                                                      │
-│ Settings:                                            │
-│ ☐ Randomize question order                         │
-│ ☐ Show correct answers after submission             │
-│ ☐ Show score immediately                            │
-│ ☐ Allow re-attempts     Max attempts: [3]          │
-│                                                      │
-│ Security:                                            │
-│ ☐ IP Restriction (Whitelist for exam hall)         │
-│   IPs: [____________________]                       │
-│                                                      │
-│ Plagiarism Detection:                               │
-│ Sensitivity: [High ▼]                              │
-│                                                      │
-│ Date & Time:                                        │
-│ Start: [Jan 15, 2026] [10:00 AM]                   │
-│ End:   [Jan 15, 2026] [01:00 PM]                   │
-│                                                      │
-│ Status:                                              │
-│ ◉ Published        ◯ Draft                          │
-│                                                      │
-│ ─────────────────────────────────────────────────   │
-│ [◀ Back]  [Create Assessment]                       │
-└──────────────────────────────────────────────────────┘
-```
-
----
-
-### 5.5 Admin: User Management
-
-**Layout: Data Table + Side Panel**
-
-```
-┌────────────────────────────────────────────────────────┐
-│ CodeQuest       User Management              [Menu]   │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│ [+ Create User] [Import CSV]  Search: [________]  [🔍]  │
-│ Filter: Role [All ▼] Status [Active ▼]                 │
-│                                                          │
-│ ┌────┬──────────┬──────────────┬──────────┬────────┐   │
-│ │ ☑  │ Email    │ Name         │ Role     │ Status │   │
-│ ├────┼──────────┼──────────────┼──────────┼────────┤   │
-│ │ ☐  │ raj@uni. │ Rajesh Kumar │ Professor│ Active │   │
-│ │    │ edu      │              │          │        │   │
-│ ├────┼──────────┼──────────────┼──────────┼────────┤   │
-│ │ ☐  │ arj@uni. │ Arjun Sharma │ Student  │ Active │   │
-│ │    │ edu      │              │          │        │   │
-│ ├────┼──────────┼──────────────┼──────────┼────────┤   │
-│ │ ☐  │ pri@uni. │ Priya Desai  │ Admin    │ Active │   │
-│ │    │ edu      │              │          │        │   │
-│ └────┴──────────┴──────────────┴──────────┴────────┘   │
-│                                                          │
-│ Showing 1-10 of 145 users  [◀ 1 2 3 ... ▶]             │
-└────────────────────────────────────────────────────────┘
-```
-
-**Create User Modal:**
-
-```
-┌──────────────────────────────────────┐
-│ Create New User                [✕]   │
-├──────────────────────────────────────┤
-│                                      │
-│ Email *                              │
-│ [____________________________]        │
-│                                      │
-│ Full Name *                          │
-│ [____________________________]        │
-│                                      │
-│ Role *                               │
-│ ◉ Student  ◯ Professor  ◯ Admin     │
-│                                      │
-│ Department *                         │
-│ [Computer Science ▼]                │
-│                                      │
-│ Enrollment ID (for students)         │
-│ [____________________________]        │
-│                                      │
-│ ☐ Send temporary password to email   │
-│                                      │
-│ ────────────────────────────────────│
-│ [Cancel]         [Create User]       │
-└──────────────────────────────────────┘
-```
-
----
-
-## 6. Responsive Design Guidelines
-
-### 6.1 Breakpoints
-
-| Device | Width | Layout |
-|--------|-------|--------|
-| **Mobile** | <640px | Single column, stacked content |
-| **Tablet** | 640px - 1024px | 2-column layout |
-| **Desktop** | >1024px | 3-column with sidebars |
-| **Large Screen** | >1440px | Full-width with optimal max-width |
-
-### 6.2 Responsive Patterns
-
-#### Navigation
-
-**Mobile:**
-- Hamburger menu (top-left)
-- Bottom tab navigation for primary sections
-- Overlay navigation drawer on menu open
-
-**Tablet:**
-- Collapsible sidebar (80px collapsed width)
-- Top navigation bar
-- Bottom tab bar for quick access
-
-**Desktop:**
-- Persistent sidebar (260px)
-- Top navigation bar
-- Breadcrumb navigation
-
-#### Code Editor
-
-**Mobile:**
-- Full-screen code editor
-- Problem statement in collapsible panel
-- Output below editor with scroll
-
-**Tablet:**
-- Split-screen: problem left (40%), editor right (60%)
-- Problem statement resizable
-- Output in popup/modal
-
-**Desktop:**
-- Split-screen: problem left (35%), editor right (65%)
-- Output panel below editor
-- All panels visible simultaneously
-
-#### Forms
-
-**Mobile:**
-- Full-width inputs
-- Single column layout
-- Labels above fields
-- Larger touch targets (48px minimum)
-
-**Tablet:**
-- 2-column grid for related fields
-- Responsive spacing
-
-**Desktop:**
-- 2-3 column grid
-- Optimal form width: 600px max
-
-### 6.3 Touch-Friendly Design (Mobile)
-
-- **Minimum Touch Target:** 48px × 48px
-- **Button Padding:** 12px vertical, 16px horizontal
-- **Input Height:** 48px
-- **Spacing:** 16px between elements
-- **Font Size:** Minimum 16px to prevent zoom on iOS
-
-### 6.4 Desktop-Optimized Design
-
-- **Hover States:** All interactive elements
-- **Keyboard Navigation:** Full support (Tab, Enter, Escape)
-- **Cursor:** Changes (pointer, text, resize, etc.)
-- **Tooltips:** On icon-only buttons and truncated text
-
----
-
-## 7. Accessibility Standards
-
-### 7.1 WCAG 2.1 AA Compliance
-
-#### Color Contrast
-
-| Element | Ratio | Standard |
-|---------|-------|----------|
-| **Text on background** | 4.5:1 | AA (normal), AAA (7:1) |
-| **Large text** | 3:1 | AA |
-| **UI components** | 3:1 | AA |
-| **Graphical elements** | 3:1 | AA |
-
-**Testing:** Use WebAIM contrast checker or Axe DevTools browser extension
-
-#### Keyboard Navigation
-
-- **Tab Order:** Logical, left-to-right, top-to-bottom
-- **Focus Visible:** Clear 3px outline, minimum 2px solid color
-- **Skip Links:** "Skip to main content" at top of page
-- **Focus Trap:** Modal dialogs trap focus until closed
-- **Keyboard Shortcuts:** Documented and accessible
-
-#### Semantic HTML
-
-```html
-<!-- Good: Semantic structure -->
-<header>
-  <nav>
-    <ul>
-      <li><a href="/">Home</a></li>
-    </ul>
-  </nav>
-</header>
-<main>
-  <article>
-    <h1>Assessment Title</h1>
-  </article>
-</main>
-<footer>
-  <p>© 2026 CodeQuest</p>
-</footer>
-
-<!-- Avoid: Generic divs -->
-<div class="header">
-  <div class="nav">
-    <div class="links">
-      <div><a href="/">Home</a></div>
-    </div>
-  </div>
-</div>
-```
-
-#### ARIA Labels
-
-```html
-<!-- Button with icon only -->
-<button aria-label="Close modal">✕</button>
-
-<!-- Input with associated label -->
-<label for="email">Email Address</label>
-<input id="email" type="email" required>
-
-<!-- Live region for real-time updates -->
-<div aria-live="polite" aria-atomic="true" role="status">
-  Tests passed: 3/5
-</div>
-
-<!-- Complex component description -->
-<div role="region" aria-label="Code submission results">
-  ...
-</div>
-```
-
-#### Form Accessibility
-
-```html
-<!-- Required fields -->
-<label for="name">
-  Name <span aria-label="required">*</span>
-</label>
-<input id="name" required>
-
-<!-- Error messages linked to inputs -->
-<input id="password" type="password" aria-describedby="pwd-error">
-<span id="pwd-error" role="alert">
-  Password must be at least 8 characters
-</span>
-
-<!-- Validation feedback -->
-<input aria-invalid="true" aria-describedby="error-message">
-<span id="error-message" role="alert">Invalid email format</span>
-```
-
-### 7.2 Accessibility Checklist
-
-- [ ] All images have descriptive alt text (not "image" or "photo")
-- [ ] All form inputs have associated labels
-- [ ] Color is not the only way to convey information (use icons + text)
-- [ ] Focus indicators are visible on all interactive elements
-- [ ] Videos have captions and transcripts
-- [ ] Font sizes are scalable (use relative units like rem)
-- [ ] Content reflows properly at 200% zoom
-- [ ] No time limits on interactive tasks (or easily extendable)
-- [ ] Links are distinguishable from body text (underline or color + icon)
-- [ ] Error messages are specific and actionable
-
----
-
-## 8. Design Patterns
-
-### 8.1 Feedback Patterns
-
-#### Success Pattern
-
-```
-┌─────────────────────────────────┐
-│ ✓ Submission successful          │
-│ Your code has been submitted.    │
-│ [View Results]                  │
-└─────────────────────────────────┘
-```
-
-**Specifications:**
-- **Color:** #22C55E (success green)
-- **Icon:** ✓ checkmark
-- **Duration:** 5-second auto-dismiss OR manual close
-- **Position:** Top-right, fixed
-- **Animation:** Slide in from top (200ms), fade out (300ms)
-
-#### Error Pattern
-
-```
-┌─────────────────────────────────┐
-│ ✕ Compilation Error              │
-│ Unexpected token '}' on line 5   │
-│ [Show Details]  [✕]             │
-└─────────────────────────────────┘
-```
-
-**Specifications:**
-- **Color:** #C01530 (error red)
-- **Icon:** ✕ or ⚠
-- **Duration:** Persistent (user must close)
-- **Position:** Top-right or inline
-- **Action:** "Show Details" for stack trace
-
-#### Loading Pattern
-
-```
-┌─────────────────────────────────┐
-│ ⟳ Running tests...               │
-│ Executing test case 2 of 5       │
-└─────────────────────────────────┘
-```
-
-**Specifications:**
-- **Icon:** Animated spinner or progress ring
-- **Text:** Brief status message
-- **Duration:** Auto-hide on completion
-- **Position:** Centered or top-right
-- **Animation:** Smooth rotation (1.5s per rotation)
-
-### 8.2 Empty States
-
-#### No Assessments
-
-```
-┌────────────────────────────────┐
-│                                │
-│      📋 No Assessments         │
-│                                │
-│  You don't have any            │
-│  assessments yet.              │
-│                                │
-│  Check back later or contact   │
-│  your professor.               │
-│                                │
-└────────────────────────────────┘
-```
-
-**Specifications:**
-- **Icon:** Large illustrative icon (100px+)
-- **Heading:** Clear, friendly message
-- **Subtext:** Explanation + next steps
-- **Action:** Optional CTA button
-- **Background:** Subtle pattern or solid color (#F9FAFB)
-
-### 8.3 Confirmation Dialogs
-
-#### Delete Confirmation
-
-```
-┌──────────────────────────────────┐
-│ Delete Question?              [✕]│
-├──────────────────────────────────┤
-│                                  │
-│ Are you sure you want to delete  │
-│ "Two Sum"?                       │
-│                                  │
-│ This action cannot be undone.    │
-│                                  │
-│ ──────────────────────────────── │
-│ [Cancel]         [Delete]        │
-└──────────────────────────────────┘
-```
-
-**Specifications:**
-- **Heading:** Clear action statement
-- **Body:** Consequences of action
-- **Primary Button:** Danger color (#C01530)
-- **Secondary Button:** Gray (cancel)
-- **Default Action:** Cancel (on Escape key)
-
----
-
-## 9. Animation & Interactions
-
-### 9.1 Micro-interactions
-
-#### Button Click
+### 2.1 Custom Colors (Tailwind `extend.colors`)
+
+Defined in `index.html` Tailwind config:
+
+| Token | Hex | Usage |
+|---|---|---|
+| `primary.DEFAULT` | `#0d8ea5` | Buttons, active states, links, brand accent |
+| `primary.dark` | `#0a7385` | Button hover, hero backgrounds |
+| `primary.light` | `#208192` | Subtle tints |
+| `background.light` | `#f6f8f8` | Page background (light mode) |
+| `background.dark` | `#101f22` | Page background (dark mode) |
+| `background.card` | `#1a2c30` | Card surfaces (dark mode) |
+
+All other colors use Tailwind defaults: `slate`, `red`, `green`, `amber`, `blue`, `purple`, `orange`, `emerald`, `teal`.
+
+### 2.2 Typography
+
+| Element | Font | Weight | Tailwind Class | Notes |
+|---|---|---|---|---|
+| Page headings | Manrope | 700 | `text-3xl font-bold` | `letter-spacing: -0.02em` via index.css |
+| Section headings | Manrope | 700 | `text-xl font-bold` | |
+| Body text | Manrope | 400 | Default | `letter-spacing: -0.011em` via index.css |
+| Labels | Manrope | 600 | `text-sm font-semibold` | |
+| Small/muted text | Manrope | 500 | `text-sm text-slate-500` | `dark:text-slate-400` |
+| Code / monospace | JetBrains Mono | 400 | `font-mono` | Fira Code fallback |
+| Buttons | Manrope | 700 | `font-bold` | Never `font-black` (w900) |
+
+### 2.3 Font Rendering (index.css)
 
 ```css
-/* Press animation */
-@keyframes buttonPress {
-  0% { transform: scale(1); }
-  50% { transform: scale(0.98); }
-  100% { transform: scale(1); }
+body {
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
 }
-
-button:active {
-  animation: buttonPress 150ms ease-out;
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
 }
 ```
 
-**Duration:** 150ms  
-**Easing:** cubic-bezier(0.34, 1.56, 0.64, 1)
+---
 
-#### Hover Effects
+## 3. Component Inventory
+
+### 3.1 Shared Components (`components/`)
+
+| Component | File | Purpose |
+|---|---|---|
+| Layout | `Layout.tsx` | Sidebar + top bar + main content wrapper; handles all 3 roles |
+| ConfirmModal | `ConfirmModal.tsx` | Styled confirmation dialog; `danger`/`warning`/`info` variants; ARIA attributes |
+| ErrorBoundary | `ErrorBoundary.tsx` | React error boundary with styled fallback UI |
+
+### 3.2 Shared Utilities (`utils/formatters.ts`)
+
+Centralized formatting functions used across 10+ screens:
+
+- `formatDate`, `formatDateShort`, `formatTime`, `formatDateTime`, `formatRelativeTime`
+- `formatDuration` (seconds to "Xm Ys")
+- `getInitials` (name to avatar initials)
+- `getAssessmentStatusBadge`, `getSubmissionStatusColor`, `getSubmissionStatusIcon`
+- `getDifficultyColor`, `getDifficultyBadge`
+- `getNotificationIcon`, `getNotificationColor`
+- `validatePassword`, `isPasswordValid`
+- `escapeHtml` (XSS prevention for export)
+
+### 3.3 Inline Patterns (not extracted to components)
+
+These patterns are used across multiple screens but implemented inline:
+
+- **Stat cards**: 4-column grid with icon, label, value — used in StudentProfile, ProfessorDashboard, SystemHealth, UserManagement
+- **Data tables**: 12-column CSS grid with header row, dividers — used in Leaderboard, SubmissionHistory, SystemLogs
+- **Filter bars**: Search input + select dropdowns + view toggles — used in Leaderboard, QuestionBank, AllAssessments, UserManagement
+- **Form layouts**: Label + input stacks with `space-y-4` — used in Login, Signup, CreateQuestion, CreateAssessment, StudentProfile
+- **Empty states**: Centered icon + message when data is absent — inconsistently implemented
+- **Loading spinners**: `animate-spin` on a bordered circle div — used inline in buttons
+
+---
+
+## 4. Screen Inventory
+
+### 4.1 Public Screens (no auth required)
+
+| Screen | File | Route | Description |
+|---|---|---|---|
+| Login | `Login.tsx` | `/login` | Email/password form with split layout (branding left, form right on desktop) |
+| Signup | `Signup.tsx` | `/signup` | Registration with role, department, enrollment ID; password strength validation |
+| Forgot Password | `ForgotPassword.tsx` | `/forgot-password` | Email input for reset link |
+| Reset Password | `ResetPassword.tsx` | `/reset-password` | New password entry from Supabase recovery URL |
+| Role Selection | `RoleSelection.tsx` | `/role-select` | Demo/development screen; 3 role cards |
+
+### 4.2 Student Screens
+
+| Screen | File | Route | Description |
+|---|---|---|---|
+| Dashboard | `StudentDashboard.tsx` | `/student/dashboard` | Greeting, upcoming assessments list with status badges |
+| Assessments | `AllAssessments.tsx` | `/student/assessments` | Filterable assessment list with search, status, difficulty filters |
+| Assessment Instructions | `AssessmentInstructions.tsx` | `/student/assessments/:id/instructions` | Pre-exam instructions with rules and start button |
+| Code Editor | `CodeEditor.tsx` | `/student/assessments/:id/editor` | Monaco editor with problem panel, test runner, submission; ~1700 lines |
+| Assessment Results | `AssessmentResults.tsx` | `/student/assessments/:id/results` | Score summary with per-question breakdown |
+| Submissions | `SubmissionHistory.tsx` | `/student/submissions` | Sortable/filterable submission history with detail expansion |
+| Leaderboard | `Leaderboard.tsx` | `/student/leaderboard` | Podium + table/card views with search, department filter, time range |
+| Profile | `StudentProfile.tsx` | `/student/profile` | Hero banner, stats cards, settings form, edit/share modals |
+| Notifications | `Notifications.tsx` | `/student/notifications` | Notification list with read/unread, type icons, relative timestamps |
+
+### 4.3 Professor Screens
+
+| Screen | File | Route | Description |
+|---|---|---|---|
+| Dashboard | `ProfessorDashboard.tsx` | `/professor/dashboard` | Quick actions (assessments, questions, leaderboard) |
+| Assessment Hub | `ProfessorAssessmentHub.tsx` | `/professor/assessments` | Tabbed view: assessments list, questions, submissions |
+| Create Assessment | `CreateAssessment.tsx` | `/professor/assessments/create` | Multi-step wizard: details, questions, settings, review |
+| Edit Assessment | `CreateAssessment.tsx` | `/professor/assessments/:id/edit` | Same component in edit mode |
+| Question Bank | `QuestionBank.tsx` | `/professor/questions` | Filterable question grid with bulk select |
+| Create Question | `CreateQuestion.tsx` | `/professor/questions/create` | Tabbed form: details, test cases, settings |
+| Edit Question | `CreateQuestion.tsx` | `/professor/questions/:id/edit` | Same component in edit mode |
+| Leaderboard | `Leaderboard.tsx` | `/professor/leaderboard` | Shared component |
+| Notifications | `Notifications.tsx` | `/professor/notifications` | Shared component |
+
+### 4.4 Admin Screens
+
+| Screen | File | Route | Description |
+|---|---|---|---|
+| Courses | `CourseManagement.tsx` | `/admin/courses` | Default admin landing; course/class CRUD |
+| User Management | `UserManagement.tsx` | `/admin/users` | User table with create/edit/delete modals, bulk upload |
+| Admin Management | `AdminManagement.tsx` | `/admin/admins` | Admin user management |
+| System Health | `SystemHealth.tsx` | `/admin/system-health` | Database, execution, memory, cache status; auto-refresh |
+| System Logs | `SystemLogs.tsx` | `/admin/system-logs` | Activity log table with action filters, search |
+| Backups | `BackupManagement.tsx` | `/admin/backups` | Backup list with create/restore/download/delete |
+| Leaderboard | `Leaderboard.tsx` | `/admin/leaderboard` | Shared component |
+| Notifications | `Notifications.tsx` | `/admin/notifications` | Shared component |
+
+### 4.5 Unrouted Screens (on disk, no route)
+
+| Screen | File | Status |
+|---|---|---|
+| Live Monitor | `LiveMonitor.tsx` | Built but unrouted; real-time proctoring view |
+| Analytics | `Analytics.tsx` | Built but unrouted; class/assessment analytics |
+| Group Setup | `GroupSetup.tsx` | Built but unrouted; class group management |
+| Plagiarism Report | `PlagiarismReport.tsx` | Built but unrouted; similarity comparison view |
+| Admin Settings | `AdminSettings.tsx` | Built but unrouted; platform configuration |
+
+---
+
+## 5. Route Structure & Navigation
+
+### 5.1 Route Hierarchy
+
+```
+/login                          (public)
+/signup                         (public)
+/forgot-password                (public)
+/reset-password                 (public)
+/role-select                    (public, demo)
+
+/student/                       (ProtectedRoute, role=student)
+  dashboard
+  assessments
+  assessments/:id/instructions
+  assessments/:id/editor        (outside Layout — full-screen editor)
+  assessments/:id/results
+  submissions
+  leaderboard
+  profile
+  notifications
+
+/professor/                     (ProtectedRoute, role=professor)
+  dashboard
+  assessments
+  assessments/create
+  assessments/:id/edit
+  questions
+  questions/create
+  questions/:id/edit
+  leaderboard
+  notifications
+
+/admin/                         (ProtectedRoute, role=admin)
+  courses                       (default landing)
+  users
+  admins
+  system-health
+  system-logs
+  backups
+  leaderboard
+  notifications
+```
+
+### 5.2 Sidebar Navigation
+
+Defined in `Layout.tsx`. Each role has a fixed sidebar:
+
+**Student**: Dashboard, Assessments, Submissions, Leaderboard, Profile, Notifications
+
+**Professor**: Dashboard, Assessments, Questions, Leaderboard, Notifications
+
+**Admin**: Courses, User Management, Admins, System Health, System Logs, Backups, Leaderboard, Notifications
+
+### 5.3 Top Bar
+
+- Page title (derived from active sidebar link label)
+- Notification bell icon (links to `/{role}/notifications`)
+- User avatar (initials) + name + role label
+
+---
+
+## 6. Layout System
+
+### 6.1 Shell Structure
+
+```
+┌──────────────────────────────────────────────┐
+│ Sidebar (w-64, collapsible to w-20)          │
+│ ┌──────────┐ ┌─────────────────────────────┐ │
+│ │ Logo     │ │ Top Bar (h-16)              │ │
+│ ├──────────┤ ├─────────────────────────────┤ │
+│ │ Nav      │ │                             │ │
+│ │ links    │ │ Main Content                │ │
+│ │          │ │ (overflow-y-auto)           │ │
+│ ├──────────┤ │                             │ │
+│ │ Collapse │ │                             │ │
+│ │ Theme    │ │                             │ │
+│ │ Logout   │ │                             │ │
+│ └──────────┘ └─────────────────────────────┘ │
+└──────────────────────────────────────────────┘
+```
+
+### 6.2 Content Area Patterns
+
+Most screens use: `p-6 md:p-10 max-w-7xl mx-auto space-y-6`
+
+- Page header: title (`text-3xl font-bold`) + description + action buttons
+- Filter/toolbar bar: white card with search + filters
+- Content: cards, tables, or grids
+- Modals: fixed overlay with centered card, `shadow-xl`, `rounded-xl`
+
+---
+
+## 7. Design Conventions
+
+### 7.1 Cards
+
+- Background: `bg-white dark:bg-background-card`
+- Border: `border border-slate-200 dark:border-slate-800`
+- Radius: `rounded-xl` (never `rounded-2xl`)
+- Shadow: `shadow-sm` (never `shadow-lg` or `shadow-2xl`)
+- Hover: `hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700`
+
+### 7.2 Buttons
+
+- Primary: `bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-sm`
+- Secondary: `border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800`
+- Danger: `bg-red-600 hover:bg-red-700 text-white`
+- Icon-only: `p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800`
+- All buttons: `inline-flex items-center justify-center` (via index.css global rule)
+
+### 7.3 Forms
+
+- Labels: `block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2`
+- Inputs: `w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary focus:border-transparent`
+- Spacing: `space-y-4` between fields
+
+### 7.4 Modals
+
+- Overlay: `fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4`
+- Card: `bg-white dark:bg-background-card rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200 dark:border-slate-800`
+- Header: Title + close button row
+- Close icon: `material-symbols-outlined` "close"
+
+### 7.5 Status Badges
+
+Status badges use Tailwind color utilities per status. Defined in `utils/formatters.ts`:
+
+| Status | Colors |
+|---|---|
+| Published/Active | `bg-green-100 text-green-700` (dark: `bg-green-900/20 text-green-400`) |
+| Draft | `bg-slate-100 text-slate-600` |
+| Completed | `bg-blue-100 text-blue-700` |
+| Failed/Rejected | `bg-red-100 text-red-700` |
+
+### 7.6 Icons
+
+- Set: Material Symbols Outlined (variable font)
+- Default settings: `FILL 0, wght 400, GRAD 0, opsz 24`
+- Filled variant: class `filled` → `FILL 1` (used for active sidebar links)
+- Sizing: `text-lg` (18px), `text-xl` (20px), `text-2xl` (24px), `text-3xl` (30px), `text-4xl` (36px)
+- Decorative icons should have `aria-hidden="true"`
+
+### 7.7 Shadows (hierarchy)
+
+| Usage | Class |
+|---|---|
+| Cards at rest | `shadow-sm` |
+| Cards on hover | `shadow-md` |
+| Modals | `shadow-xl` |
+| Never used | `shadow-lg`, `shadow-2xl` |
+| Never used | Colored shadows (`shadow-primary/20`) |
+
+### 7.8 Transitions
+
+Scoped via index.css to interactive elements only:
 
 ```css
-/* Subtle lift */
-a:hover {
-  color: var(--color-primary);
-  text-decoration: underline;
-}
-
-.card:hover {
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
-  transition: all 250ms ease-out;
+a, button, input, select, textarea,
+[class*="hover:"], [class*="transition"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
 }
 ```
 
-**Duration:** 250ms  
-**Easing:** ease-out (cubic-bezier(0.16, 1, 0.3, 1))
-
-#### Focus Ring
-
-```css
-:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-```
-
-**Outline Width:** 2px  
-**Outline Color:** #208090  
-**Outline Offset:** 2px
-
-### 9.2 Page Transitions
-
-#### Fade In/Out
-
-```css
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.page {
-  animation: fadeIn 300ms ease-out;
-}
-```
-
-**Duration:** 300ms  
-**Easing:** ease-out
-
-#### Slide In (Assessment Start)
-
-```css
-@keyframes slideInUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.assessment-start {
-  animation: slideInUp 400ms ease-out;
-}
-```
-
-**Duration:** 400ms  
-**Easing:** ease-out
-
-### 9.3 Transition Duration Standards
-
-| Component | Duration | Purpose |
-|-----------|----------|---------|
-| **Button Hover** | 150ms | Quick feedback |
-| **Navigation Menu** | 250ms | Smooth slide |
-| **Modal Appear** | 300ms | Noticeable but not slow |
-| **Page Transition** | 300-400ms | Context change |
-| **Loading Spinner** | 1500ms per rotation | Continuous motion |
-| **Toast Dismiss** | 300ms | Auto-fade out |
+No global `*` transition. No bounce, float, shimmer, glow-pulse, or gradient-shift animations.
 
 ---
 
-## 10. Design Tokens
+## 8. Accessibility
 
-### 10.1 Token Definitions
+### 8.1 Implemented
 
-#### Color Tokens
+- `aria-label` on all icon-only buttons in Layout (collapse, theme, logout, notifications)
+- `aria-expanded` on sidebar collapse toggle
+- `aria-hidden="true"` on decorative icons in Layout footer
+- `role="dialog"`, `aria-modal`, `aria-labelledby` on ConfirmModal and StudentProfile edit modal
+- `:focus-visible` outline: `2px solid #0d8ea5` with `2px offset` (index.css)
+- Semantic `<nav>`, `<header>`, `<main>`, `<aside>` elements in Layout
+- Form `<label>` elements linked to inputs
 
-```json
-{
-  "color": {
-    "primary": "#208090",
-    "primary-light": "#32B8C6",
-    "primary-dark": "#1A6873",
-    "success": "#22C55E",
-    "error": "#C01530",
-    "warning": "#A84B2F",
-    "info": "#627C85",
-    "text-primary": "#1F2121",
-    "text-secondary": "#627C85",
-    "background": "#FFFCF9",
-    "surface": "#F5F5F5",
-    "border": "#D0D0D0"
-  }
-}
-```
+### 8.2 Fixed (2026-03-20 hardening plan)
 
-#### Spacing Tokens
+- `role="button"`, `tabIndex={0}`, and Enter/Space keyboard handler added to SubmissionHistory clickable rows
+- Escape key close + backdrop click close added to StudentProfile edit/share modals
 
-```json
-{
-  "space": {
-    "0": "0",
-    "1": "4px",
-    "2": "8px",
-    "3": "12px",
-    "4": "16px",
-    "5": "20px",
-    "6": "24px",
-    "7": "32px",
-    "8": "40px",
-    "9": "48px"
-  }
-}
-```
+### 8.3 Fixed (2026-03-20 deep audit)
 
-#### Typography Tokens
+- `aria-label` added to password show/hide toggle buttons on Login, Signup, ResetPassword ("Show password"/"Hide password")
+- `aria-hidden="true"` added to password toggle icon spans
+- Session expiry modal in CodeEditor: students mid-assessment see actionable "Session Expired" modal instead of silent 401 failures
 
-```json
-{
-  "typography": {
-    "h1": {
-      "font-size": "30px",
-      "font-weight": 600,
-      "line-height": "1.2"
-    },
-    "h2": {
-      "font-size": "24px",
-      "font-weight": 600,
-      "line-height": "1.2"
-    },
-    "body": {
-      "font-size": "14px",
-      "font-weight": 400,
-      "line-height": "1.5"
-    },
-    "code": {
-      "font-family": "'Courier New', monospace",
-      "font-size": "13px",
-      "font-weight": 400
-    }
-  }
-}
-```
+### 8.4 Remaining Gaps
 
-#### Shadow Tokens
-
-```json
-{
-  "shadow": {
-    "sm": "0 1px 3px rgba(0, 0, 0, 0.08)",
-    "md": "0 4px 6px rgba(0, 0, 0, 0.12)",
-    "lg": "0 10px 25px rgba(0, 0, 0, 0.2)",
-    "xl": "0 20px 40px rgba(0, 0, 0, 0.3)"
-  }
-}
-```
-
-#### Border Radius Tokens
-
-```json
-{
-  "radius": {
-    "sm": "4px",
-    "base": "6px",
-    "md": "8px",
-    "lg": "12px",
-    "full": "9999px"
-  }
-}
-```
+- No skip-link implementation
+- No focus trap in modals (only escape close on StudentProfile modals so far)
+- Sidebar has no ARIA `role="navigation"` region label per section
 
 ---
 
-## 11. Implementation Notes for Developers
+## 9. Responsive Design
 
-### 11.1 Component Library Structure
+### 9.1 Breakpoints
 
-```
-src/components/
-├── common/
-│   ├── Button/
-│   │   ├── Button.tsx
-│   │   ├── Button.module.css
-│   │   └── Button.stories.tsx
-│   ├── Card/
-│   ├── Input/
-│   └── ...
-├── layout/
-│   ├── Navigation/
-│   ├── Sidebar/
-│   └── MainLayout/
-├── assessment/
-│   ├── ProblemStatement/
-│   ├── CodeEditor/
-│   └── TestResults/
-└── admin/
-    ├── UserManagement/
-    └── Analytics/
-```
+Uses Tailwind default breakpoints:
 
-### 11.2 CSS Naming Convention
+| Prefix | Min-width | Usage |
+|---|---|---|
+| (none) | 0px | Mobile-first base styles |
+| `sm:` | 640px | Small tablets |
+| `md:` | 768px | Tablets / narrow desktop |
+| `lg:` | 1024px | Desktop |
+| `xl:` | 1280px | Wide desktop |
 
-Use BEM (Block Element Modifier) for CSS classes:
+### 9.2 Responsive Patterns
 
-```css
-/* Block */
-.card { }
+- **Sidebar**: Always visible; collapses to icon-only (`w-20`) via toggle button (no auto-collapse at breakpoints)
+- **Login/Signup**: Split layout (`lg:flex lg:w-1/2`) — left panel hidden below `lg`
+- **Content grids**: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` or `md:grid-cols-4`
+- **Tables**: 12-column CSS grid — no horizontal scroll handling on mobile
+- **Top bar profile**: Name/role text hidden below `md` (`hidden md:block`)
 
-/* Element */
-.card__header { }
-.card__body { }
+### 9.3 Known Gaps
 
-/* Modifier */
-.card--elevated { }
-.card--outlined { }
-
-/* State */
-.card.is-active { }
-.card.is-disabled { }
-```
-
-### 11.3 Storybook Examples
-
-```typescript
-// Button.stories.tsx
-import Button from './Button';
-
-export default {
-  title: 'Components/Button',
-  component: Button,
-};
-
-export const Primary = () => (
-  <Button variant="primary">Click me</Button>
-);
-
-export const Secondary = () => (
-  <Button variant="secondary">Click me</Button>
-);
-
-export const Disabled = () => (
-  <Button disabled>Click me</Button>
-);
-```
+- Sidebar has no responsive auto-collapse — on small screens it occupies full `w-64`
+- Data tables (Leaderboard, SystemLogs) don't adapt well below `md` breakpoint
+- No mobile hamburger menu or drawer pattern
 
 ---
 
-## 12. Design Handoff Checklist
+## 10. Dark Mode
 
-Before handing to developers, ensure:
+### 10.1 Implementation
 
-- [ ] All components documented in Figma/design tool
-- [ ] All states documented (default, hover, active, disabled, focus)
-- [ ] All responsive breakpoints specified
-- [ ] Color tokens extracted and named
-- [ ] Typography scaled and hierarchy clear
-- [ ] Spacing/padding consistent using 8px grid
-- [ ] Accessibility annotations added (ARIA labels, semantic HTML suggestions)
-- [ ] Micro-interactions documented with duration/easing
-- [ ] Focus states visible on all interactive elements
-- [ ] Error states shown for all form inputs
-- [ ] Empty states illustrated
-- [ ] Loading states documented
-- [ ] Skeleton screens for data loading
-- [ ] Design tokens exported (colors, typography, spacing, shadows)
-- [ ] Link to Figma file/design tool included
-- [ ] Annotation/comments for non-obvious design decisions
+- Tailwind `darkMode: 'class'` strategy
+- Toggle in Layout sidebar footer
+- `<body>` receives `dark` class
+- Persisted via `localStorage` in AppContext
 
----
+### 10.2 Color Mapping
 
-## 13. Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0 | 2026-01-11 | Initial UI/UX mockup document |
+| Element | Light | Dark |
+|---|---|---|
+| Page background | `bg-background-light` (`#f6f8f8`) | `bg-background-dark` (`#101f22`) |
+| Card/sidebar | `bg-white` | `bg-background-card` (`#1a2c30`) |
+| Text primary | `text-slate-900` | `text-white` |
+| Text secondary | `text-slate-500` | `text-slate-400` |
+| Borders | `border-slate-200` | `border-slate-800` |
+| Hover backgrounds | `hover:bg-slate-50` / `hover:bg-slate-100` | `hover:bg-slate-800` |
+| Code editor | Light theme (Monaco default) | Not switched (known gap) |
 
 ---
 
-## 14. Design References & Tools
+## Appendix: Changes from v1.0 (January 2026)
 
-### Recommended Tools
+The original v1.0 UI/UX doc was a pre-development mockup specification. The following significant deviations occurred during implementation:
 
-- **Design:** Figma (component library, prototypes, handoff)
-- **Prototyping:** Figma, Adobe XD, or Penpot
-- **Testing:** Chrome DevTools, Lighthouse, Axe DevTools
-- **Accessibility:** WebAIM, WAVE, Accessible Colors Checker
-- **Documentation:** Confluence, Notion, Storybook
-
-### Resources
-
-- WCAG 2.1 Guidelines: https://www.w3.org/WAI/WCAG21/quickref/
-- Material Design 3: https://m3.material.io/
-- Apple HIG: https://developer.apple.com/design/human-interface-guidelines/
-- A11y Project: https://www.a11yproject.com/
-
----
-
-**End of UI/UX Mockup Document**
-
-*For design questions or clarifications, contact the design team.*
-*For implementation questions, refer to the PRD (Product Requirements Document).*
+| Aspect | v1.0 Spec | v2.0 Actual |
+|---|---|---|
+| Primary color | `#208090` | `#0d8ea5` |
+| UI font | Inter | Manrope |
+| Code font | Courier New | JetBrains Mono |
+| Component library | 20+ documented | 3 shared + inline patterns |
+| Design tokens | JSON token system | Tailwind config + defaults |
+| Unrouted screens | None planned | 5 built but unrouted |
+| Admin landing | Dashboard | CourseManagement |
+| Analytics | Comprehensive spec | Unrouted |
+| Plagiarism UI | Detailed spec | Unrouted |
+| Gradients | Used extensively | Removed (2026-03-20 cleanup) |
+| Animations | 12+ custom keyframes | All removed (2026-03-20 cleanup) |
+| Admin leaderboard | Not in original | Added (2026-03-20 hardening plan) |
+| Form validation | Basic (title/desc only) | Type-specific: coding test cases, MCQ options, date ranges (2026-03-20) |
+| Bulk actions | No handlers | QuestionBank bulk visible/hide/delete wired (2026-03-20) |
+| Modal a11y | None | Escape close + backdrop click on StudentProfile modals (2026-03-20) |

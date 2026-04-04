@@ -3,11 +3,13 @@ import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-do
 import { useApp } from '../store/AppContext';
 import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 // Public Screens
 import Login from '../screens/Login';
 import Signup from '../screens/Signup';
 import ForgotPassword from '../screens/ForgotPassword';
+import ResetPassword from '../screens/ResetPassword';
 import RoleSelection from '../screens/RoleSelection';
 
 // Student Screens
@@ -23,13 +25,9 @@ import Leaderboard from '../screens/Leaderboard';
 // Professor Screens
 import ProfessorDashboard from '../screens/ProfessorDashboard';
 import ProfessorAssessmentHub from '../screens/ProfessorAssessmentHub';
-import LiveMonitor from '../screens/LiveMonitor';
 import CreateAssessment from '../screens/CreateAssessment';
 import QuestionBank from '../screens/QuestionBank';
 import CreateQuestion from '../screens/CreateQuestion';
-import GroupSetup from '../screens/GroupSetup';
-import PlagiarismReport from '../screens/PlagiarismReport';
-import Analytics from '../screens/Analytics';
 
 // Admin Screens
 import UserManagement from '../screens/UserManagement';
@@ -38,7 +36,6 @@ import CourseManagement from '../screens/CourseManagement';
 import SystemHealth from '../screens/SystemHealth';
 import SystemLogs from '../screens/SystemLogs';
 import BackupManagement from '../screens/BackupManagement';
-import AdminSettings from '../screens/AdminSettings';
 import Notifications from '../screens/Notifications';
 import { demoAssessment } from '../data/demoModeData';
 
@@ -137,7 +134,7 @@ const DemoEntryPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
       <div className="max-w-md w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xl">
-        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-lg font-black tracking-wide">
+        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-lg font-bold tracking-wide">
           CQ
         </div>
         <h2 className="text-2xl font-bold mb-2">CodeQuest Demo</h2>
@@ -161,7 +158,6 @@ const AppRoutes: React.FC = () => {
     currentAssessment,
     submissions,
     leaderboard,
-    plagiarismResults,
     editingAssessment,
     editingQuestion,
     login,
@@ -265,6 +261,7 @@ const AppRoutes: React.FC = () => {
   );
 
   return (
+    <ErrorBoundary>
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={loginOrDashboard} />
@@ -289,6 +286,7 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/demo" element={<DemoEntryPage />} />
       <Route
         path="/role-selection"
@@ -375,10 +373,7 @@ const AppRoutes: React.FC = () => {
                     <SubmissionHistory
                       submissions={submissions}
                       questions={questions}
-                      onViewSubmission={(submission) => console.log('View submission:', submission)}
-                      onResubmit={(questionId) => {
-                        navigate(`/student/assessments`);
-                      }}
+                      onResubmit={() => navigate('/student/assessments')}
                     />
                   }
                 />
@@ -388,11 +383,16 @@ const AppRoutes: React.FC = () => {
                     <Leaderboard
                       entries={leaderboard}
                       currentUserId={currentUser?.id}
-                      timeRange="month"
-                      onTimeRangeChange={() => { }}
                     />
                   }
                 />
+                <Route path="notifications" element={
+                  <Notifications
+                    notifications={notifications}
+                    onMarkRead={markNotificationRead}
+                    onClearAll={clearNotifications}
+                  />
+                } />
                 <Route path="*" element={<Navigate to="/student/dashboard" replace />} />
               </Routes>
             </Layout>
@@ -404,7 +404,11 @@ const AppRoutes: React.FC = () => {
         path="/student/assessments/:assessmentId/instructions"
         element={
           <ProtectedRoute requiredRole="student">
-            <StudentInstructionsPage />
+            <Layout role="student" onLogout={handleLogout} darkMode={darkMode} toggleTheme={toggleDarkMode} userName={currentUser?.name}>
+              <ErrorBoundary>
+                <StudentInstructionsPage />
+              </ErrorBoundary>
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -420,7 +424,11 @@ const AppRoutes: React.FC = () => {
         path="/student/assessments/:assessmentId/results"
         element={
           <ProtectedRoute requiredRole="student">
-            <StudentResultsPage />
+            <Layout role="student" onLogout={handleLogout} darkMode={darkMode} toggleTheme={toggleDarkMode} userName={currentUser?.name}>
+              <ErrorBoundary>
+                <StudentResultsPage />
+              </ErrorBoundary>
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -438,17 +446,7 @@ const AppRoutes: React.FC = () => {
               userName={currentUser?.name}
             >
               <Routes>
-                <Route
-                  path="dashboard"
-                  element={<ProfessorDashboard onNavigate={(view) => {
-                    if (view === 'assessments') navigate('/professor/assessments');
-                    else if (view === 'questions') navigate('/professor/questions');
-                    else if (view === 'analytics') navigate('/professor/analytics');
-                    else if (view === 'leaderboard') navigate('/professor/leaderboard');
-                    else if (view === 'live-monitor') navigate('/professor/live-monitor');
-                    else navigate(`/professor/${view}`);
-                  }} />}
-                />
+                <Route path="dashboard" element={<ProfessorDashboard />} />
                 <Route
                   path="assessments"
                   element={
@@ -522,6 +520,13 @@ const AppRoutes: React.FC = () => {
                       }}
                       onDeleteQuestion={deleteQuestion}
                       onToggleVisibility={(id, visible) => updateQuestion(id, { isVisible: visible })}
+                      onEditQuestion={(id) => {
+                        const question = questions.find(q => q.id === id);
+                        if (question) {
+                          setEditingQuestion(question);
+                          navigate(`/professor/questions/${id}/edit`);
+                        }
+                      }}
                     />
                   }
                 />
@@ -546,24 +551,22 @@ const AppRoutes: React.FC = () => {
                     />
                   }
                 />
-                <Route path="live-monitor" element={<LiveMonitor onBack={() => navigate('/professor/dashboard')} />} />
-                <Route
-                  path="analytics"
-                  element={<Analytics role="professor" />}
-                />
                 <Route
                   path="leaderboard"
                   element={
                     <Leaderboard
                       entries={leaderboard}
                       currentUserId={currentUser?.id}
-                      timeRange="month"
-                      onTimeRangeChange={() => { }}
                     />
                   }
                 />
-                <Route path="group-setup" element={<GroupSetup onBack={() => navigate('/professor/dashboard')} />} />
-                <Route path="plagiarism" element={<PlagiarismReport onBack={() => navigate('/professor/assessments')} />} />
+                <Route path="notifications" element={
+                  <Notifications
+                    notifications={notifications}
+                    onMarkRead={markNotificationRead}
+                    onClearAll={clearNotifications}
+                  />
+                } />
                 <Route path="*" element={<Navigate to="/professor/dashboard" replace />} />
               </Routes>
             </Layout>
@@ -608,22 +611,24 @@ const AppRoutes: React.FC = () => {
                     />
                   }
                 />
-                <Route
-                  path="analytics"
-                  element={<Analytics role="admin" />}
-                />
                 <Route path="system-health" element={<SystemHealth health={systemHealth} onRefresh={refreshSystemHealth} />} />
-                <Route path="system-logs" element={<SystemLogs logs={systemLogs} users={users} onExport={() => {}} />} />
+                <Route path="system-logs" element={<SystemLogs logs={systemLogs} users={users} />} />
                 <Route path="backups" element={
                   <BackupManagement
                     backups={backups}
                     onCreateBackup={createBackup}
-                    onRestoreBackup={() => {}}
                     onDeleteBackup={deleteBackup}
-                    onDownloadBackup={() => {}}
                   />
                 } />
-                <Route path="settings" element={<AdminSettings />} />
+                <Route
+                  path="leaderboard"
+                  element={
+                    <Leaderboard
+                      entries={leaderboard}
+                      currentUserId={currentUser?.id}
+                    />
+                  }
+                />
                 <Route path="notifications" element={
                   <Notifications
                     notifications={notifications}
@@ -638,10 +643,10 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Shared Protected Routes */}
       {/* Catch all - redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </ErrorBoundary>
   );
 };
 

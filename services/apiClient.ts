@@ -95,8 +95,9 @@ async function apiFetch<T = any>(
     if (refreshed) {
       return apiFetch<T>(path, options, false);
     }
-    // Refresh failed — clear tokens
+    // Refresh failed — clear tokens and notify any listeners
     tokenStore.clear();
+    window.dispatchEvent(new CustomEvent('cq:session-expired'));
     throw new ApiError(401, 'Session expired. Please log in again.');
   }
 

@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Role } from '../types';
 import { useApp } from '../store/AppContext';
+import { validatePassword, isPasswordValid as checkPasswordValid } from '../utils/formatters';
 
 const Signup: React.FC = () => {
   const navigate = useNavigate();
   const { signup, currentUser } = useApp();
-  
+
   useEffect(() => {
     if (currentUser) {
       const dashboardPath =
         currentUser.role === 'student' ? '/student/dashboard' :
         currentUser.role === 'professor' ? '/professor/dashboard' :
-        '/admin/dashboard';
+        '/admin/courses';
       navigate(dashboardPath, { replace: true });
     }
   }, [currentUser, navigate]);
@@ -27,19 +28,8 @@ const Signup: React.FC = () => {
   const [error, setError] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
 
-  const validatePassword = (pwd: string) => {
-    const checks = {
-      length: pwd.length >= 8,
-      uppercase: /[A-Z]/.test(pwd),
-      lowercase: /[a-z]/.test(pwd),
-      number: /[0-9]/.test(pwd),
-      special: /[!@#$%^&*]/.test(pwd),
-    };
-    return checks;
-  };
-
   const passwordChecks = validatePassword(password);
-  const isPasswordValid = Object.values(passwordChecks).every(Boolean);
+  const isPasswordValid = checkPasswordValid(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,11 +79,11 @@ const Signup: React.FC = () => {
             <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
               <span className="material-symbols-outlined text-xl">code_blocks</span>
             </div>
-            <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white">CodeQuest</span>
+            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">CodeQuest</span>
           </div>
 
           <div>
-            <h2 className="text-3xl font-black text-slate-900 dark:text-white">Create your account</h2>
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Create your account</h2>
             <p className="text-slate-500 dark:text-slate-400 mt-2">Join thousands of students mastering code</p>
           </div>
 
@@ -195,8 +185,9 @@ const Signup: React.FC = () => {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  <span className="material-symbols-outlined text-xl">
+                  <span className="material-symbols-outlined text-xl" aria-hidden="true">
                     {showPassword ? 'visibility_off' : 'visibility'}
                   </span>
                 </button>
@@ -272,7 +263,7 @@ const Signup: React.FC = () => {
             <button
               type="submit"
               disabled={loading || !isPasswordValid || password !== confirmPassword || !agreeTerms}
-              className="w-full py-3 px-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-lg shadow-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -301,7 +292,7 @@ const Signup: React.FC = () => {
       </div>
 
       {/* Right Panel - Illustration */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-900">
         {/* Code Pattern Background */}
         <div className="absolute inset-0 opacity-20">
           <pre className="text-primary text-xs leading-5 p-8 whitespace-pre-wrap font-mono">
@@ -346,7 +337,7 @@ HAVING COUNT(s.id) > 10;`}
               12,000+ Active Students
             </div>
 
-            <h2 className="text-4xl font-black leading-tight mb-6">
+            <h2 className="text-4xl font-bold leading-tight mb-6">
               Join the<br />
               <span className="text-primary">Coding Revolution</span>
             </h2>

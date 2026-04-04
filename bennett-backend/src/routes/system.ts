@@ -82,7 +82,10 @@ system.get("/logs", requireRole("admin"), async (c) => {
   if (userId) query = query.eq("user_id", userId);
 
   const { data, error } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to fetch system logs");
+    return sendError(c, 500, "Failed to fetch system logs");
+  }
 
   return sendSuccess(c, (data ?? []).map((row) => ({
     id: row.id,
@@ -123,7 +126,10 @@ system.post("/backups", requireRole("admin"), async (c) => {
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to create backup");
+    return sendError(c, 500, "Failed to create backup");
+  }
 
   // Notify admin that backup completed (fire-and-forget)
   createNotification({
@@ -152,7 +158,10 @@ system.delete("/backups/:id", requireRole("admin"), async (c) => {
   const supabase = getSupabaseAdmin();
 
   const { error } = await supabase.from("backups").delete().eq("id", id);
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, backupId: id }, "Failed to delete backup");
+    return sendError(c, 500, "Failed to delete backup");
+  }
 
   return sendSuccess(c, { message: "Backup deleted" });
 });
@@ -181,7 +190,10 @@ system.put("/plagiarism/:id/review", requireRole("teacher", "admin"), async (c) 
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, plagiarismResultId: id }, "Failed to update plagiarism review");
+    return sendError(c, 500, "Failed to update plagiarism review");
+  }
 
   return sendSuccess(c, {
     id: data.id,
@@ -207,14 +219,18 @@ system.post("/plagiarism/scan/:assessmentId", requireRole("teacher", "admin"), a
 
   const supabase = getSupabaseAdmin();
 
-  // Verify assessment exists
+  // Verify assessment exists and teacher owns it
   const { data: assessment, error: aErr } = await supabase
     .from("assessments")
-    .select("id, title, settings")
+    .select("id, title, settings, created_by")
     .eq("id", assessmentId)
     .single();
 
   if (aErr || !assessment) return sendError(c, 404, "Assessment not found");
+
+  if (user.role === "teacher" && assessment.created_by !== user.id) {
+    return sendError(c, 403, "You do not have access to this assessment");
+  }
 
   // Fetch all submissions for this assessment with student info
   const { data: submissions, error: sErr } = await supabase
@@ -222,7 +238,10 @@ system.post("/plagiarism/scan/:assessmentId", requireRole("teacher", "admin"), a
     .select("id, student_id, question_id, code, language, profiles!submissions_student_id_fkey(name)")
     .eq("assessment_id", assessmentId);
 
-  if (sErr) return sendError(c, 500, sErr.message);
+  if (sErr) {
+    log.error({ err: sErr, assessmentId }, "Failed to fetch submissions for plagiarism scan");
+    return sendError(c, 500, "Failed to run plagiarism scan");
+  }
   if (!submissions || submissions.length < 2) {
     return sendSuccess(c, {
       message: "Not enough submissions to compare",
@@ -324,8 +343,8 @@ system.post("/plagiarism/scan/:assessmentId", requireRole("teacher", "admin"), a
       .insert(allResults);
 
     if (insertErr) {
-      log.error({ err: insertErr, assessmentId }, "plagiarism_results insert error");
-      return sendError(c, 500, "Failed to persist plagiarism results: " + insertErr.message);
+      log.error({ err: insertErr, assessmentId }, "Failed to persist plagiarism results");
+      return sendError(c, 500, "Failed to persist plagiarism results");
     }
   }
 
@@ -375,7 +394,10 @@ system.get("/plagiarism/:assessmentId", requireRole("teacher", "admin"), async (
     .eq("assessment_id", assessmentId)
     .order("similarity_score", { ascending: false });
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, assessmentId }, "Failed to fetch plagiarism results");
+    return sendError(c, 500, "Failed to fetch plagiarism results");
+  }
 
   return sendSuccess(c, (data ?? []).map(mapPlagiarismRow));
 });
@@ -550,7 +572,10 @@ system.get("/monitoring/:assessmentId/events", requireRole("teacher", "admin"), 
   }
 
   const { data, error, count } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, assessmentId }, "Failed to fetch monitoring events");
+    return sendError(c, 500, "Failed to fetch monitoring events");
+  }
 
   return sendSuccess(c, {
     events: data ?? [],
@@ -579,6 +604,23 @@ system.post("/monitoring/:assessmentId/events", async (c) => {
 
   const supabase = getSupabaseAdmin();
 
+  // Security: verify attemptId belongs to the authenticated user and is in-progress
+  const { data: attempt } = await supabase
+    .from("assessment_attempts")
+    .select("id, student_id, assessment_id, status")
+    .eq("id", body.attemptId)
+    .single();
+
+  if (!attempt || attempt.student_id !== user.id) {
+    return sendError(c, 403, "Attempt does not belong to you");
+  }
+  if (attempt.assessment_id !== assessmentId) {
+    return sendError(c, 400, "Attempt does not match this assessment");
+  }
+  if (attempt.status !== "in-progress") {
+    return sendError(c, 400, "Attempt is not in progress");
+  }
+
   const { error } = await supabase.from("monitoring_events").insert({
     attempt_id: body.attemptId,
     assessment_id: assessmentId,
@@ -587,7 +629,10 @@ system.post("/monitoring/:assessmentId/events", async (c) => {
     payload: body.payload ?? {},
   });
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, assessmentId, userId: user.id }, "Failed to log monitoring event");
+    return sendError(c, 500, "Failed to log monitoring event");
+  }
 
   return sendSuccess(c, { logged: true }, 201);
 });
@@ -619,7 +664,10 @@ system.get("/monitoring/:assessmentId/summary", requireRole("teacher", "admin"),
     .eq("assessment_id", assessmentId)
     .eq("event_type", "violation");
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, assessmentId }, "Failed to fetch monitoring summary");
+    return sendError(c, 500, "Failed to fetch monitoring summary");
+  }
 
   // Aggregate by student
   const byStudent = new Map<string, { total: number; types: Record<string, number> }>();

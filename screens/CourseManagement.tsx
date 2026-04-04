@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ClassInfo, ClassStudent, User } from '../types';
 import { useApp } from '../store/AppContext';
 import { classService } from '../services/classService';
+import ConfirmModal from '../components/ConfirmModal';
 
 const CourseManagement: React.FC = () => {
     const { users, classes, loadClasses, loadUsers } = useApp();
@@ -62,14 +63,16 @@ const CourseManagement: React.FC = () => {
         }
     };
 
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
     const handleDeleteClass = async (id: string) => {
-        if (!confirm('Delete this class? Students will be unenrolled.')) return;
         try {
             await classService.remove(id);
             await loadClasses();
         } catch (err: any) {
-            alert(err?.message || 'Failed to delete class');
+            setErrorMsg(err?.message || 'Failed to delete class');
         }
+        setDeleteConfirmId(null);
     };
 
     const openEnrollModal = async (classId: string) => {
@@ -126,7 +129,7 @@ const CourseManagement: React.FC = () => {
                 </div>
                 <button
                     onClick={() => { setClassForm({ name: '', code: '', description: '', department: '', teacherId: '', schedule: '' }); setEditingClass(null); setErrorMsg(''); setShowClassModal(true); }}
-                    className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
+                    className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-sm"
                 >
                     <span className="material-symbols-outlined">add</span>
                     Create Class
@@ -221,9 +224,9 @@ const CourseManagement: React.FC = () => {
                                     }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg" title="Edit">
                                         <span className="material-symbols-outlined">edit</span>
                                     </button>
-                                    <button onClick={() => handleDeleteClass(cls.id)}
-                                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500" title="Delete">
-                                        <span className="material-symbols-outlined">delete</span>
+                                    <button onClick={() => setDeleteConfirmId(cls.id)}
+                                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500" title="Delete" aria-label="Delete class">
+                                        <span className="material-symbols-outlined" aria-hidden="true">delete</span>
                                     </button>
                                 </div>
                             </div>
@@ -235,7 +238,7 @@ const CourseManagement: React.FC = () => {
             {/* Create/Edit Class Modal */}
             {showClassModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl max-w-lg w-full p-6 shadow-xl">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-2xl font-bold">{editingClass ? 'Edit Class' : 'Create Class'}</h3>
                             <button onClick={() => setShowClassModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -295,7 +298,7 @@ const CourseManagement: React.FC = () => {
             {/* Student Enrollment Modal */}
             {showEnrollModal && enrollClassId && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl max-w-2xl w-full p-6 shadow-xl max-h-[80vh] overflow-hidden flex flex-col">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-2xl font-bold">Manage Students</h3>
                             <button onClick={() => { setShowEnrollModal(false); setEnrollClassId(null); }} className="text-slate-400 hover:text-slate-600">
@@ -340,6 +343,15 @@ const CourseManagement: React.FC = () => {
                     </div>
                 </div>
             )}
+            <ConfirmModal
+                open={!!deleteConfirmId}
+                title="Delete Class"
+                message="This will permanently delete this class and unenroll all students. This action cannot be undone."
+                confirmLabel="Delete"
+                variant="danger"
+                onConfirm={() => deleteConfirmId && handleDeleteClass(deleteConfirmId)}
+                onCancel={() => setDeleteConfirmId(null)}
+            />
         </div>
     );
 };

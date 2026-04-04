@@ -140,9 +140,11 @@ const ContextWiring: React.FC<{ children: ReactNode }> = ({ children }) => {
   useEffect(() => {
     if (!auth.isAuthenticated) {
       questions._setQuestions([]);
+      questions.setEditingQuestion(null);
       assessments._setAssessments([]);
       assessments._setCurrentAssessment(null);
       assessments._setCurrentAttempt(null);
+      assessments.setEditingAssessment(null);
       submissions._setSubmissions([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

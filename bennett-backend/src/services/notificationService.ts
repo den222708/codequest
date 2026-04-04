@@ -30,6 +30,15 @@ interface CreateNotificationParams {
 
 // ── Core helper ──────────────────────────────────────────────────────
 
+/** Sanitize notification link: only allow relative paths (no external URLs) */
+function sanitizeLink(link?: string): string | null {
+  if (!link) return null;
+  // Only allow relative paths starting with / (but not // which is protocol-relative)
+  if (link.startsWith("/") && !link.startsWith("//")) return link;
+  // Block all absolute URLs (including http/https) to prevent phishing
+  return null;
+}
+
 /** Insert a single notification row. Fire-and-forget. */
 export async function createNotification(params: CreateNotificationParams): Promise<void> {
   try {
@@ -39,7 +48,7 @@ export async function createNotification(params: CreateNotificationParams): Prom
       title: params.title,
       message: params.message,
       type: params.type,
-      link: params.link ?? null,
+      link: sanitizeLink(params.link),
     });
     if (error) log.error({ err: error }, "insert failed");
   } catch (err) {
@@ -58,12 +67,13 @@ export async function createBulkNotifications(
   if (userIds.length === 0) return;
   try {
     const supabase = getSupabaseAdmin();
+    const safeLink = sanitizeLink(link);
     const rows = userIds.map((userId) => ({
       user_id: userId,
       title,
       message,
       type,
-      link: link ?? null,
+      link: safeLink,
     }));
     const { error } = await supabase.from("notifications").insert(rows);
     if (error) log.error({ err: error }, "bulk insert failed");

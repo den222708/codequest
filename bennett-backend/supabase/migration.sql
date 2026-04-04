@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   tests_passed    INT NOT NULL DEFAULT 0,
   tests_total     INT NOT NULL DEFAULT 0,
   test_results    JSONB DEFAULT '[]',
-  status          TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'partial', 'rejected', 'error')) DEFAULT 'pending',
+  status          TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'partial', 'rejected', 'error', 'wrong_answer')) DEFAULT 'pending',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -493,13 +493,16 @@ CREATE TRIGGER classes_updated_at BEFORE UPDATE ON classes
 -- Token Blacklist (persistent revoked token store)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS token_blacklist (
-  token_hash  TEXT PRIMARY KEY,
-  user_id     UUID REFERENCES profiles(user_id) ON DELETE CASCADE,
-  revoked_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  expires_at  TIMESTAMPTZ NOT NULL
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  token_hash TEXT NOT NULL UNIQUE,
+  user_id    UUID REFERENCES profiles(user_id) ON DELETE CASCADE,
+  revoked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_created ON token_blacklist(created_at);
 
 -- ── Backups ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS backups (

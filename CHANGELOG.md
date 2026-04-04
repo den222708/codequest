@@ -1,5 +1,310 @@
 # Changelog
 
+## [2026-03-20T23:30:00Z] - Deep Audit Fix Pass: IDORs, Error Hardening, UX Safety (22 issues)
+
+### Critical IDOR Fixes (Backend)
+
+**Reason:** Four parallel deep audit agents identified 3 critical IDOR vulnerabilities allowing cross-tenant data access in analytics and question management.
+
+- **Question visibility IDOR** (`questions.ts`): `PATCH /questions/:id/visibility` now checks `created_by === user.id` for teachers. Previously any teacher could toggle visibility on any question. PUT and DELETE already had this check; PATCH was missed.
+- **Assessment analytics IDOR** (`analytics.ts`): `GET /analytics/assessment/:id` now verifies assessment ownership for teachers. Previously any teacher could view scores, student names, and performance for any assessment.
+- **Student analytics privacy** (`analytics.ts`): `GET /analytics/student/:id` now scopes teacher access to students enrolled in their classes. Previously any teacher could view any student's full analytics.
+
+### High Severity Fixes
+
+- **Layout default links** (`Layout.tsx`): Changed `default: return adminLinks` to `default: return []`. Unknown/null roles no longer get admin sidebar navigation.
+- **Session expiry in CodeEditor** (`CodeEditor.tsx`): Added `cq:session-expired` event listener with a modal overlay. Students mid-exam whose session expires now see "Session Expired" with a login link instead of silent 401 failures.
+- **Assessment question points** (`assessments.ts`): Question links now fetch each question's `points` from the DB instead of hardcoding `points: 0`. Fixes broken grading where all questions scored 0.
+- **DB error message exposure** (all backend routes): Replaced `sendError(c, 500, error.message)` with generic messages across all route files. Added `log.error()` with full error context for debugging. Prevents leaking Supabase/Postgres table names, constraint names, and column info to API callers.
+- **Double-submit prevention** — deferred (requires per-screen `isSubmitting` state across 5+ forms; tracked for next session).
+
+### Medium Severity Fixes
+
+- **Notification link phishing** (`notificationService.ts`): `sanitizeLink()` now only allows relative paths (starting with `/`). All absolute URLs (including `http://`/`https://`) are blocked to prevent phishing links in notifications.
+- **JSON.parse crash protection** (`assessmentService.ts`, `questionService.ts`): All `JSON.parse()` calls for `settings`, `tags`, and `boilerplateCode` now wrapped in try-catch with safe defaults (`defaultSettings()`, `[]`, `{}`). Malformed JSON from backend no longer crashes the data mapping.
+- **Password toggle accessibility** (`Login.tsx`, `Signup.tsx`, `ResetPassword.tsx`): Added `aria-label` ("Show password"/"Hide password") and `aria-hidden="true"` on icon spans for all show/hide password buttons.
+- **Editing state persists across logout** (`AppContext.tsx`): Logout reset now clears `editingQuestion` and `editingAssessment`. Previously, stale edit state from the previous user could persist.
+- **Submissions pagination** (`submissions.ts`): `GET /submissions` now supports `offset` and `limit` query params (default 50, max 100) with `range()` instead of hard `.limit(100)`.
+
+### Low Severity — Tracked but Deferred
+
+- Search input debouncing (AllAssessments, UserManagement, QuestionBank)
+- Modal focus traps (ConfirmModal, UserManagement)
+- Deep link to assessment editor on reload
+- Large list pagination (UserManagement, AllAssessments)
+- Leaderboard badge tooltips
+- UserManagement table column sorting
+- Language change warning in CodeEditor
+
+### Build Verification
+
+- Frontend `tsc --noEmit`: 0 errors
+- Backend `tsc --noEmit`: 0 errors
+
+---
+
+## [2026-03-20T22:00:00Z] - Comprehensive Bug Fix, Security Hardening & UI Cleanup (55-item plan)
+
+### Phase 1: Critical Security (Backend)
+
+**Reason:** Exploitable vulnerabilities identified via deep audit — WebSocket endpoints accepted unauthenticated connections, IDOR allowed cross-tenant data access, password history used weak hashing.
+
+- **WebSocket auth** (`socketServer.ts`): Added JWT validation middleware to `/proctoring` and `/admin` namespaces. Connections without valid tokens are rejected. Admin namespace requires teacher/admin role. Student join uses authenticated user ID.
+- **WebSocket transport** (`socketServer.ts`): Changed `transports` from `["websocket", "polling"]` to `["websocket"]` to eliminate CSRF vector on polling transport.
+- **Monitoring endpoint IDOR** (`system.ts`): `POST /system/monitoring/:assessmentId/events` now validates that `attemptId` belongs to the authenticated user and is in-progress.
+- **Plagiarism scan ownership** (`system.ts`): Teachers can now only scan plagiarism for their own assessments.
+- **Submission time limit** (`submissions.ts`): Backend now enforces `assessment.duration` per-attempt with 60s grace period. Previously only checked `end_date`.
+- **Teacher IDOR** (`submissions.ts`): `GET /submissions?assessmentId=X` for teachers now validates assessment ownership.
+- **Password history hashing** (`auth.ts`): Replaced SHA256 (no salt, instant crack) with scrypt (salted, 64-byte derived key, timing-safe comparison) for password reuse checks.
+
+### Phase 2: Frontend Bugs & Mismatches
+
+**Reason:** Non-functional buttons, missing validation, and state inconsistencies identified via UI audit.
+
+- **Dynamic Tailwind fix** (`UserManagement.tsx`): Replaced string-interpolated `bg-${color}-500/10` classes (invisible to Tailwind JIT) with a static lookup map.
+- **Modal escape/backdrop** (`StudentProfile.tsx`): Edit Profile and Share modals now close on Escape key and backdrop click.
+- **CreateQuestion validation** (`CreateQuestion.tsx`): Save button now validates test cases (coding), MCQ options (text + correct answer), and correct answer (short_answer/true_false) — not just title/description/topic.
+- **CreateAssessment validation** (`CreateAssessment.tsx`): Step 3 now validates that end date/time is after start date/time.
+- **QuestionBank buttons** (`QuestionBank.tsx`): Wired Import button to file input, wired bulk Make Visible / Hide / Delete buttons to batch operations on selected questions.
+- **AllAssessments Edit button** (`AllAssessments.tsx`): Wired Edit button `onClick` to navigate to `edit-assessment` view.
+- **Admin leaderboard route** (`routes/index.tsx`, `Layout.tsx`): Added missing admin leaderboard route and sidebar link.
+- **Auth state sync** (`apiClient.ts`, `AuthContext.tsx`): Token refresh failure now dispatches `cq:session-expired` event to clear React auth state, preventing "logged in" UI with expired tokens.
+- **Submission field mapping** (`submissionService.ts`): `mapSubmission()` now extracts `attemptId`, `studentName`, and `questionTitle` from backend responses.
+
+### Phase 3: Medium Security Hardening
+
+**Reason:** Defense-in-depth fixes for data leakage, session races, and password policy enforcement gaps.
+
+- **Question visibility bypass** (`assessments.ts`): `GET /assessments/:id` now strips `solution` field and hides `expectedOutput` of hidden test cases for student users. Invisible questions are filtered out.
+- **IP restriction enforcement** (`assessments.ts`): `POST /assessments/:id/attempts` now checks `settings.ipRestriction` and validates client IP against `settings.allowedIPs`.
+- **Session TOCTOU fix** (`auth.ts`): `enforceSessionLimit()` now inserts the new session first, then prunes excess — eliminates race where two concurrent logins both see room and both insert.
+- **Failed login reset logging** (`auth.ts`): `resetFailedLogins()` now logs errors instead of silently swallowing them.
+- **Password expiry on refresh** (`auth.ts`): `/auth/refresh` now checks `password_changed_at` before issuing new tokens, matching the check in `authMiddleware`.
+- **Unused types cleanup** (`types.ts`): Removed `Feedback`, `Course`, `Semester`, `Lab`, `StudentGroup` — none were imported anywhere.
+
+### Phase 4: Accessibility & UX Polish
+
+- **Clickable div a11y** (`SubmissionHistory.tsx`): Added `role="button"`, `tabIndex={0}`, and keyboard handler (Enter/Space) to submission rows.
+- **Type safety** (`CreateQuestion.tsx`): Replaced `as any` cast with `as typeof activeTab`.
+- **Notification link XSS** (`notificationService.ts`): Added `sanitizeLink()` that rejects `javascript:`, `data:`, and other dangerous URI schemes. Only relative paths and http/https URLs are allowed.
+
+### Build Verification
+
+- Frontend `tsc --noEmit`: 0 errors
+- Backend `tsc --noEmit`: 0 errors
+
+---
+
+## [2026-03-20T18:00:00Z] - Vibecoded UI Cleanup: Dead CSS Removal, Gradient Simplification, Visual Consistency
+
+Researched vibecoded UI anti-patterns from professional design analysis ([DEV.to 100-site study](https://dev.to/kaplich/i-analyzed-100-vibe-coded-websites-and-found-these-common-mistakes-5275), [Medium vibe-coded design analysis](https://medium.com/@zivilema/why-all-vibe-coded-designs-look-the-same-709c0db84317), [The Crit vibe coding design guide](https://www.thecrit.co/resources/vibe-coding-design-guide)). Identified 20 specific tells, scanned the entire codebase, and removed every instance.
+
+### Dead CSS Removed from `index.css` (222 lines → 72 lines)
+
+**Reason:** None of these classes or animations were referenced anywhere in the codebase (verified via `grep` across all `.tsx`/`.ts`/`.html` files). They were leftover scaffolding from AI-generated code and inflated the CSS bundle for zero benefit.
+
+- **7 unused `@keyframes`**: `bounce-in`, `gradient-shift`, `float`, `float-delayed`, `shimmer`, `glow-pulse`, `rotate-slow` — flashy animations (floating, pulsing glow, infinite shimmer) that professional apps never use
+- **5 more unused `@keyframes`**: `slide-in`, `fade-in`, `scale-in`, `slide-up`, `text-reveal` — entrance animations with no referencing component
+- **12 unused `.animate-*` utility classes** for all of the above
+- **5 unused `.stagger-*` delay classes** (`stagger-1` through `stagger-5`)
+- **6 unused effect classes**:
+  - `.glass`, `.glass-dark` — glassmorphism (backdrop-blur + translucent bg); identified as a top vibecoded tell
+  - `.btn-premium` — sweep-shine hover effect via `::before` pseudo-element
+  - `.gradient-text` — gradient-clipped text with animated background-size
+  - `.bg-grid-pattern` — SVG grid overlay background
+  - `.noise-overlay` — `::before` SVG noise texture at 3% opacity
+
+### Gradient Simplification
+
+**Reason:** Multi-stop gradients (`from-X via-Y to-Z`) on hero sections and avatars are a hallmark of AI-generated UI. Professional apps (Linear, Vercel, Stripe, Notion) use flat colors or single-tone backgrounds.
+
+| File | Before | After | Why |
+|---|---|---|---|
+| `Login.tsx` (left panel) | `bg-gradient-to-br from-primary via-primary-dark to-[#0a4f5c]` | `bg-primary-dark` | 3-stop gradient → solid brand color |
+| `Signup.tsx` (right panel) | `bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900` | `bg-slate-900` | Imperceptible gradient → solid |
+| `StudentProfile.tsx` (hero) | `bg-gradient-to-r from-primary via-primary-dark to-[#0a4f5c]` | `bg-primary-dark` | Same 3-stop pattern as Login |
+| `StudentProfile.tsx` (avatar) | Double `bg-gradient-to-br from-white/30 to-white/10` + `from-white/20 to-white/5` | `bg-white/15` + `bg-white/10` solid | Layered gradients → single opacity |
+| `StudentProfile.tsx` (avatar border) | `shadow-xl` | `shadow-sm` | Excessive shadow on profile circle |
+| `CodeEditor.tsx` (header icon) | `bg-gradient-to-br from-teal-400 to-teal-600` | `bg-primary` | 2-stop gradient → theme token |
+| `StudentDashboard.tsx` (thumbnail) | `bg-gradient-to-br from-slate-700 to-slate-900` | `bg-slate-800` | Unnecessary gradient on small element |
+
+### Leaderboard Podium Overhaul (`Leaderboard.tsx`)
+
+**Reason:** The podium section was the most gradient-heavy component in the app. Every avatar, pillar, and card used `bg-gradient-to-br`/`bg-gradient-to-t` with opacity layering — classic vibecoded pattern.
+
+- **`getRankColor()`**: Changed from gradient pairs (`from-amber-400 to-amber-600`) to solid backgrounds (`bg-amber-500`, `bg-slate-400`, `bg-orange-500`)
+- **`getRankBg()`**: Changed from gradient backgrounds (`bg-gradient-to-br from-amber-500/20 to-amber-600/10`) to solid with proper dark mode (`bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20`)
+- **Podium pillars**: `bg-gradient-to-t from-amber-400/30 to-amber-500/10` → `bg-amber-50 dark:bg-amber-500/10` (and equivalents for 2nd/3rd)
+- **Podium avatars**: Removed `shadow-lg` and `bg-gradient-to-br` prefix from all three positions
+- **1st place ring**: `ring-amber-400/30` → `ring-amber-200 dark:ring-amber-400/30` for light mode readability
+- **Current user bar**: `bg-gradient-to-r from-primary/20 to-teal-600/10` → `bg-primary/5` (subtle tint, no gradient)
+- **Table view avatars**: `bg-gradient-to-br from-slate-400 to-slate-500` → `bg-slate-500`
+- **Card view avatars**: Removed `bg-gradient-to-br` prefix, uses solid `getRankColor()`
+
+### Border Radius Standardization
+
+**Reason:** `rounded-2xl` (1rem) on cards is an oversized radius more typical of landing pages than application UI. Professional tools use `rounded-xl` (0.75rem) or `rounded-lg` (0.5rem).
+
+- `RoleSelection.tsx` — 3 role cards: `rounded-2xl` → `rounded-xl`
+- `StudentProfile.tsx` — stat cards, settings, edit modal, share modal: `rounded-2xl` → `rounded-xl`
+- `ForgotPassword.tsx` — form card: `rounded-2xl` → `rounded-xl`
+- `ResetPassword.tsx` — form card: `rounded-2xl` → `rounded-xl`
+
+### Shadow Cleanup (final stragglers)
+
+- `CodeEditor.tsx` — submit confirmation modal: `shadow-2xl` → `shadow-xl`
+- `ErrorBoundary.tsx` — error fallback card: `shadow-lg` → `shadow-sm`
+
+### Build Verification
+
+- TypeScript `tsc --noEmit`: 0 errors
+- Vite production build: successful (built in 2.85s)
+- Cross-verification: zero references to any removed CSS class in `.tsx`/`.ts` files
+- No orphaned gradient fragments (`from-*`/`to-*` without `bg-gradient-*` prefix)
+
+---
+
+## [2026-03-20] - Code Quality, Security, Accessibility & Shared Utilities
+
+### Security Fixes
+- **Fixed XSS in exportService.ts**: All user-generated content (names, titles, statuses) is now escaped via `escapeHtml()` before insertion into `document.write()` HTML output
+- **Fixed unsafe `as any` type casts**: Replaced `as any` in AllAssessments sort selector and SubmissionHistory sort selector with proper typed unions (`SortKey`)
+
+### New Shared Utilities (`utils/formatters.ts`)
+- Extracted duplicated formatters into single source of truth used across 10+ screens:
+  - `formatDate`, `formatDateShort`, `formatTime`, `formatDateTime`, `formatRelativeTime`
+  - `formatDuration` (seconds to "Xm Ys")
+  - `getInitials` (name to avatar initials, handles single-word names)
+  - `getAssessmentStatusBadge`, `getSubmissionStatusColor`, `getSubmissionStatusIcon`
+  - `getDifficultyColor`, `getDifficultyBadge`
+  - `getNotificationIcon`, `getNotificationColor`
+  - `validatePassword`, `isPasswordValid` (shared password complexity rules)
+  - `escapeHtml` (XSS prevention)
+
+### New Components
+- **`components/ErrorBoundary.tsx`**: React error boundary with styled fallback UI, wraps all route groups
+- **`components/ConfirmModal.tsx`**: Styled confirmation dialog replacing native `confirm()`/`alert()`, supports danger/warning/info variants with ARIA attributes
+
+### Accessibility Improvements
+- Added `aria-label` to all icon-only buttons in Layout sidebar (collapse, theme toggle, sign out, notifications)
+- Added `aria-expanded` to sidebar collapse toggle
+- Added `aria-hidden="true"` to decorative Material Symbols icons
+- Added `role="dialog"`, `aria-modal`, `aria-labelledby`, `aria-describedby` to ConfirmModal and StudentProfile edit modal
+- Replaced Unicode symbols (checkmark/bullet) in ResetPassword password checklist with Material Symbols icons
+
+### Route & Architecture Fixes
+- **Fixed Layout bypass**: Assessment instructions and results routes now wrap in `<Layout>` + `<ErrorBoundary>` (previously rendered without sidebar/header)
+- **Fixed ProtectedRoute type safety**: Replaced unsafe `currentUser?.role as Role` cast with proper null check
+- **Added ErrorBoundary** around the entire Routes tree
+- **Fixed services/index.ts barrel**: Now exports all 15 services (was only exporting 6); fixed named vs default export mismatches for userService, classService, errorParser
+
+### Screen Fixes
+- **AllAssessments**: Uses shared `getAssessmentStatusBadge` and `getDifficultyColor`; removed 4 duplicated local functions
+- **SubmissionHistory**: Uses shared `getSubmissionStatusColor`, `getSubmissionStatusIcon`, `getDifficultyBadge`, `formatDateTime`; removed 3 duplicated local functions
+- **Notifications**: Uses shared `formatRelativeTime`, `getNotificationIcon`, `getNotificationColor`; removed 3 duplicated local functions
+- **Leaderboard**: Uses shared `formatDuration` and `getInitials`
+- **StudentDashboard**: Uses shared `formatDateShort`
+- **StudentProfile**: Fixed broken edit modal (was using `defaultValue` uncontrolled inputs; now uses controlled `value` + `onChange` bound to formData state); uses shared `getInitials`
+- **Signup**: Uses shared `validatePassword`/`isPasswordValid` from utils (was inline with incomplete special char regex `[!@#$%^&*]`, now uses `[^A-Za-z0-9]`)
+- **ResetPassword**: Uses shared `validatePassword`/`isPasswordValid`; password checklist uses Material Symbols icons in 2-column grid layout matching Signup style
+- **BackupManagement**: Uses shared `formatDateTime`
+- **SystemLogs**: Uses shared `formatDateTime`
+- **CourseManagement**: Replaced native `confirm()` with `ConfirmModal` for class deletion; replaced `alert()` with inline error state
+
+### Professional UI Polish (2026-03-20, second pass)
+- **Removed global `*` transition rule** from `index.css` — was applying color/bg transitions to every DOM element, causing layout jank. Replaced with scoped transitions only on interactive elements (`a`, `button`, `input`, `select`, `textarea`, `[class*="hover:"]`, `[class*="transition"]`)
+- **Added typographic refinements** to `index.css`: negative letter-spacing on headings (`-0.02em`), body text (`-0.011em`), antialiased rendering on all platforms
+- **Replaced `font-black` (w900) with `font-bold` (w700)** across all screens: Login, Signup, ForgotPassword, ResetPassword, RoleSelection, StudentProfile, AssessmentInstructions, AssessmentResults, AdminSettings, routes/index.tsx loading screen. Professional apps (Linear, Vercel, Stripe) never use weight 900.
+- **Removed colored button shadows** (`shadow-lg shadow-primary/20`, `shadow-lg shadow-primary/25`) across all screens — replaced with `shadow-sm`. Colored glowing shadows are a hallmark of AI-generated UI; professional apps use flat or subtle neutral shadows.
+- **Toned down card hover effects**: `hover:shadow-2xl` and `hover:shadow-lg` replaced with `hover:shadow-md` + subtle border color changes (`hover:border-slate-300 dark:hover:border-slate-700`). Cards now feel interactive without being dramatic.
+- **Downgraded modal shadows** from `shadow-2xl` to `shadow-xl` across AdminManagement, CourseManagement, QuestionBank, StudentProfile, UserManagement, ConfirmModal.
+- **Standardized modal border radius** to `rounded-xl` in CourseManagement (was `rounded-2xl`).
+- **Toned down RoleSelection hover**: `hover:shadow-2xl` -> `hover:shadow-md`, `group-hover:scale-110` -> `group-hover:scale-105`, border hover from solid primary to `primary/50`.
+
+### Remaining Code Duplication Fixes
+- **ProfessorAssessmentHub**: Replaced local `getStatusBadge`, `getDifficultyBadge`, `formatDate` with shared `getAssessmentStatusBadge`, `getDifficultyBadgeUtil`, `formatDateShort` from `utils/formatters`
+- **SystemHealth**: Replaced local `formatDate` with shared `formatDateTime`
+- **QuestionBank**: Replaced local `getDifficultyColor` with shared `getDifficultyColorUtil` from `utils/formatters`
+
+### Build Verification
+- TypeScript `tsc --noEmit`: 0 errors
+- Vite production build: successful
+
+## [2026-03-19] - UI Overhaul: Remove Dead Screens, Restyle Admin Pages, Clean Up Fake Data
+
+### Removed Screens & Routes
+- Deleted `screens/LandingPage.tsx` (886 lines, never routed)
+- Deleted `routes/RoleBasedRoute.tsx` (unused wrapper)
+- Removed 5 dead/stub screens from routes: LiveMonitor, Analytics, GroupSetup, PlagiarismReport, AdminSettings
+- Removed corresponding sidebar links from Layout for all roles
+- Removed dead View values from `types.ts`: `landing`, `live-monitor`, `group-setup`, `plagiarism`, `analytics`, `admin-settings`
+
+### ProfessorAssessmentHub Cleanup
+- Removed ~300 lines of dead tab content (analytics, plagiarism, live-monitor sections with hardcoded fake data)
+- Removed Monitor button from assessment cards; reduced tabs to assessments/questions/submissions
+- Removed stale `plagiarism` badge color branch
+
+### AllAssessments Fix
+- Replaced broken "Monitor" button (`onNavigate('live-monitor')`) with "View" button navigating to assessment instructions
+
+### ProfessorDashboard Cleanup
+- Removed `View` import and `Props` interface with `onNavigate`
+- Reduced quickActions to 3 real features: Assessments, Question Bank, Leaderboard
+
+### StudentProfile Rewrite
+- Removed all fake/hardcoded data: skills, languages, achievements, recentActivity, SVG radar chart, random heatmap, tabs
+- Kept: hero section, real stats from submissions, settings form with API save, edit/share modals
+- Reduced from ~678 lines to ~290 lines
+
+### Admin Screen Restyling (Black Console → App Theme)
+- Restyled SystemHealth.tsx, SystemLogs.tsx, BackupManagement.tsx, SubmissionHistory.tsx
+- Replaced `bg-[#1a1a1a]`/`bg-[#0d0d0d]` with `bg-white dark:bg-background-card`
+- Replaced `text-gray-*` with `text-slate-*` equivalents
+- Replaced `bg-teal-500` buttons with `bg-primary`/`hover:bg-primary-dark`
+- Replaced emoji icons with Material Symbols throughout
+- Made optional: `onExport`, `onRestoreBackup`, `onDownloadBackup`, `onViewSubmission` props
+
+### Emoji → Material Symbols
+- Replaced all emoji (medals, fire, crown, badges) with Material Symbols icons in Leaderboard.tsx
+- Replaced status icons in SystemHealth, SystemLogs, BackupManagement, SubmissionHistory
+
+### Layout Improvements
+- Better page titles: derived from sidebar link labels instead of URL segments
+- Added notification bell icon to header for all roles
+- Added notifications link to student, professor, and admin sidebars
+
+### New Route: /reset-password
+- Created `screens/ResetPassword.tsx` for Supabase password recovery flow
+- Extracts `access_token` from URL hash, validates password complexity, calls backend
+- Added public route in `routes/index.tsx`
+
+### Leaderboard Fixes
+- Made `timeRange` and `onTimeRangeChange` props optional with local state fallback
+- Removed no-op route handler props from routes/index.tsx
+
+### Verification
+- `npx tsc --noEmit`: PASS (0 errors)
+- `npx vite build`: PASS
+
+---
+
+## [2026-03-19] - Integrate `disable-devtool` package
+
+### Added
+- Installed `disable-devtool` npm dependency
+- `services/devtoolProtection.ts` — production-only wrapper around `disable-devtool`
+  - Detectors: DefineId, DateToString, FuncToString, Debugger, Performance, DebugLib (Size excluded to avoid mobile false positives)
+  - "Exam Paused" overlay replaces page HTML when DevTools detected
+  - Developer bypass via `?ddtk=<key>` and `VITE_DEVTOOL_BYPASS_HASH` env var
+  - `ondevtoolopen` callback supports piping violations to monitoring pipeline
+  - Skipped entirely in dev mode (`import.meta.env.DEV`)
+- Exported `initDevtoolProtection` / `isDevtoolProtectionActive` from `services/index.ts`
+- Initialized in `App.tsx` at module load
+- `VITE_DEVTOOL_BYPASS_HASH` documented in `.env.example`
+
+### Notes
+- The existing custom heuristic in `monitoringService.ts` (`startDevtoolsDetection`) remains active during proctored sessions. `disable-devtool` provides page-level protection independent of assessment state.
+
 ## [2026-03-18] - Supabase SQL Bootstrap Compatibility (3 fixes)
 
 ### Critical SQL Fixes
@@ -31,7 +336,7 @@
 
 ### Notes
 - If a prior SQL run partially applied objects, reset the DB (or clean objects) before rerunning the updated `master.sql`.
-- `md files/disable-devtool-guide.md` is documentation-only at this point. The app currently uses custom proctoring heuristics (`services/monitoringService.ts`) and does not install/initialize the `disable-devtool` package.
+- `md files/disable-devtool-guide.md` is the reference guide for `disable-devtool` configuration. The package is now integrated via `services/devtoolProtection.ts`.
 
 ## [2026-03-17T18:30:00Z] - Cross-Layer Bug Sweep (35 fixes)
 
@@ -493,5 +798,5 @@ Comprehensive security, correctness, and performance fixes identified during a f
 
 - The old `backend/` directory is being replaced by `bennett-backend/`.
 - Notification merge order in `NotificationContext.tsx` (client-first) was reviewed and confirmed intentional.
-- Skills, languages, achievements, and activity data in `StudentProfile.tsx` are static/hardcoded — this is by design for the current UI prototype.
+- Skills, languages, achievements, and activity data previously in `StudentProfile.tsx` have been removed (2026-03-19 UI overhaul). Profile now shows only real submission-derived stats.
 - **Reminder:** The RapidAPI key removed from `.env.local` (fix #1) was previously committed and should be rotated.

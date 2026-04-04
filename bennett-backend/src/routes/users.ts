@@ -3,8 +3,11 @@ import { z } from "zod";
 import { getSupabaseAdmin, createSupabaseClient } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
+
+const log = createChildLogger({ module: "users" });
 
 const users = new Hono<AppEnv>();
 users.use("*", authMiddleware);
@@ -37,7 +40,10 @@ users.get("/", requireRole("teacher", "admin"), async (c) => {
   query = query.order("created_at", { ascending: false });
 
   const { data, error } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to fetch users");
+    return sendError(c, 500, "Failed to fetch users");
+  }
 
   const mapped = (data ?? []).map(mapProfile);
   return sendSuccess(c, mapped);
@@ -119,7 +125,10 @@ users.put("/:id", async (c) => {
     .select()
     .single();
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error, userId: id }, "Failed to update user");
+    return sendError(c, 500, "Failed to update user");
+  }
   return sendSuccess(c, mapProfile(data));
 });
 
@@ -132,10 +141,16 @@ users.delete("/:id", requireRole("admin"), async (c) => {
 
   const supabase = getSupabaseAdmin();
   const { error: profileErr } = await supabase.from("profiles").delete().eq("user_id", id);
-  if (profileErr) return sendError(c, 500, profileErr.message);
+  if (profileErr) {
+    log.error({ err: profileErr, userId: id }, "Failed to delete user profile");
+    return sendError(c, 500, "Failed to delete user");
+  }
 
   const { error: authErr } = await supabase.auth.admin.deleteUser(id);
-  if (authErr) return sendError(c, 500, authErr.message);
+  if (authErr) {
+    log.error({ err: authErr, userId: id }, "Failed to delete user auth record");
+    return sendError(c, 500, "Failed to delete user");
+  }
 
   return sendSuccess(c, { message: "User deleted" });
 });

@@ -92,7 +92,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
                 </div>
                 <button
                     onClick={() => setShowAddModal(true)}
-                    className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
+                    className="px-5 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold flex items-center gap-2 shadow-sm"
                 >
                     <span className="material-symbols-outlined text-lg">person_add</span>
                     Add Administrator
@@ -201,7 +201,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({
             {/* Add Admin Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-background-card rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl">
+                    <div className="bg-white dark:bg-background-card rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
                         <h2 className="text-xl font-bold mb-4">Add New Administrator</h2>
                         <div className="space-y-4">
                             <div>

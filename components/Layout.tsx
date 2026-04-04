@@ -28,29 +28,26 @@ const Layout: React.FC<LayoutProps> = ({
     { icon: 'history', label: 'Submissions', path: '/student/submissions' },
     { icon: 'leaderboard', label: 'Leaderboard', path: '/student/leaderboard' },
     { icon: 'person', label: 'Profile', path: '/student/profile' },
+    { icon: 'notifications', label: 'Notifications', path: '/student/notifications' },
   ];
 
   const profLinks = [
     { icon: 'dashboard', label: 'Dashboard', path: '/professor/dashboard' },
     { icon: 'assignment', label: 'Assessments', path: '/professor/assessments' },
     { icon: 'help_outline', label: 'Questions', path: '/professor/questions' },
-    { icon: 'cast_for_education', label: 'Live Monitor', path: '/professor/live-monitor' },
-    { icon: 'analytics', label: 'Analytics', path: '/professor/analytics' },
     { icon: 'leaderboard', label: 'Leaderboard', path: '/professor/leaderboard' },
-    { icon: 'group', label: 'Group Setup', path: '/professor/group-setup' },
-    { icon: 'warning', label: 'Plagiarism', path: '/professor/plagiarism' },
+    { icon: 'notifications', label: 'Notifications', path: '/professor/notifications' },
   ];
 
   const adminLinks = [
     { icon: 'school', label: 'Courses', path: '/admin/courses' },
     { icon: 'group', label: 'User Management', path: '/admin/users' },
     { icon: 'admin_panel_settings', label: 'Admins', path: '/admin/admins' },
-    { icon: 'analytics', label: 'Analytics', path: '/admin/analytics' },
     { icon: 'monitor_heart', label: 'System Health', path: '/admin/system-health' },
     { icon: 'receipt_long', label: 'System Logs', path: '/admin/system-logs' },
     { icon: 'backup', label: 'Backups', path: '/admin/backups' },
+    { icon: 'leaderboard', label: 'Leaderboard', path: '/admin/leaderboard' },
     { icon: 'notifications', label: 'Notifications', path: '/admin/notifications' },
-    { icon: 'settings', label: 'Settings', path: '/admin/settings' },
   ];
 
   const getLinks = () => {
@@ -58,7 +55,7 @@ const Layout: React.FC<LayoutProps> = ({
       case 'student': return studentLinks;
       case 'professor': return profLinks;
       case 'admin': return adminLinks;
-      default: return adminLinks;
+      default: return [];
     }
   };
 
@@ -77,7 +74,7 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto" aria-label="Main navigation">
           {links.map((link) => {
             const isActive = location.pathname === link.path || location.pathname.startsWith(link.path + '/');
             return (
@@ -103,27 +100,31 @@ const Layout: React.FC<LayoutProps> = ({
         <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-1">
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!sidebarCollapsed}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <span className="material-symbols-outlined min-w-[24px] flex-shrink-0">
+            <span className="material-symbols-outlined min-w-[24px] flex-shrink-0" aria-hidden="true">
               {sidebarCollapsed ? 'chevron_right' : 'chevron_left'}
             </span>
             {!sidebarCollapsed && <span>Collapse</span>}
           </button>
           <button
             onClick={toggleTheme}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <span className="material-symbols-outlined min-w-[24px] flex-shrink-0">
+            <span className="material-symbols-outlined min-w-[24px] flex-shrink-0" aria-hidden="true">
               {darkMode ? 'light_mode' : 'dark_mode'}
             </span>
             {!sidebarCollapsed && <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>}
           </button>
           <button
             onClick={onLogout}
+            aria-label="Sign out"
             className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
           >
-            <span className="material-symbols-outlined min-w-[24px] flex-shrink-0">logout</span>
+            <span className="material-symbols-outlined min-w-[24px] flex-shrink-0" aria-hidden="true">logout</span>
             {!sidebarCollapsed && <span>Sign Out</span>}
           </button>
         </div>
@@ -135,11 +136,18 @@ const Layout: React.FC<LayoutProps> = ({
         <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-background-card flex items-center justify-between px-6 flex-shrink-0">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-bold capitalize">
-              {location.pathname.split('/').pop()?.replace(/-/g, ' ') || 'Dashboard'}
+              {links.find(l => location.pathname === l.path || location.pathname.startsWith(l.path + '/'))?.label || location.pathname.split('/').pop()?.replace(/-/g, ' ') || 'Dashboard'}
             </h1>
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              to={`/${role}/notifications`}
+              aria-label="Notifications"
+              className="p-2 rounded-lg text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <span className="material-symbols-outlined text-xl" aria-hidden="true">notifications</span>
+            </Link>
             {/* Profile */}
             <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-700">
               <div className="w-9 h-9 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">

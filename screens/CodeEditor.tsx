@@ -414,6 +414,7 @@ const CodeEditor: React.FC<Props> = ({ onSubmit, onExit }) => {
   const [lastAwaySeconds, setLastAwaySeconds] = useState(0);
   const [awayPopupOpen, setAwayPopupOpen] = useState(false);
   const [editorMarkers, setEditorMarkers] = useState<monacoEditor.editor.IMarkerData[]>([]);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const editorRef = useRef<monacoEditor.editor.IStandaloneCodeEditor | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
@@ -661,6 +662,13 @@ const CodeEditor: React.FC<Props> = ({ onSubmit, onExit }) => {
         document.exitFullscreen().catch(() => undefined);
       }
     };
+  }, []);
+
+  // Listen for session expiry during assessment
+  useEffect(() => {
+    const handler = () => setSessionExpired(true);
+    window.addEventListener('cq:session-expired', handler);
+    return () => window.removeEventListener('cq:session-expired', handler);
   }, []);
 
   const startResize = (type: 'sidebar' | 'description' | 'output', e: React.MouseEvent) => {
@@ -1170,7 +1178,7 @@ const CodeEditor: React.FC<Props> = ({ onSubmit, onExit }) => {
         <header className="h-12 border-b border-slate-200 bg-white flex items-center justify-between px-4 shrink-0 z-10">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
                 <span className="text-sm font-bold">&lt;/&gt;</span>
               </div>
               <span className="text-sm font-bold">CodeQuest Assessment</span>
@@ -1699,7 +1707,7 @@ const CodeEditor: React.FC<Props> = ({ onSubmit, onExit }) => {
       {/* Security Warning Popup */}
       {(securityWarningOpen || awayPopupOpen) && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-md rounded-xl border border-amber-300 bg-amber-50 shadow-2xl">
+          <div className="w-full max-w-md rounded-xl border border-amber-300 bg-amber-50 shadow-xl">
             <div className="p-5 border-b border-amber-500/30 flex items-center gap-3">
               <span className="material-symbols-outlined text-amber-700">warning</span>
               <div>
@@ -1723,6 +1731,32 @@ const CodeEditor: React.FC<Props> = ({ onSubmit, onExit }) => {
                 className="px-4 py-2 rounded bg-amber-500 hover:bg-amber-400 text-black font-semibold"
               >
                 I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Session Expired Modal */}
+      {sessionExpired && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-red-300 bg-white dark:bg-slate-800 shadow-xl">
+            <div className="p-5 border-b border-red-200 dark:border-red-800 flex items-center gap-3">
+              <span className="material-symbols-outlined text-red-500">lock</span>
+              <div>
+                <h4 className="font-bold text-red-700 dark:text-red-400">Session Expired</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Your session has ended. Please log in again to continue.</p>
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
+                Your code has been preserved in the editor. After logging back in, you can return to this assessment if it is still open.
+              </p>
+              <button
+                onClick={() => { window.location.href = '/login'; }}
+                className="w-full px-4 py-2.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-semibold transition-colors"
+              >
+                Go to Login
               </button>
             </div>
           </div>

@@ -21,32 +21,31 @@
 | **Question Bank** | No | Yes | No |
 | **User Management** | No | No | Yes |
 | **Admin Management** | No | No | Yes |
-| **Analytics** | Personal | Class | System |
-| **System Settings** | No | No | Yes |
 | **System Logs** | No | No | Yes |
 | **System Health** | No | No | Yes |
 | **Backups** | No | No | Yes |
-| **Live Monitor** | No | Yes | No |
 | **Leaderboard** | Yes | Yes | Yes |
+| **Notifications** | Yes | Yes | Yes |
 
 ## Role Details
 
 ### Student
-**Navigation:** Dashboard, Assessments, Submissions, Leaderboard, Profile
+**Navigation:** Dashboard, Assessments, Submissions, Leaderboard, Profile, Notifications
 - Can attempt quizzes and questions
 - Can view own submissions and results
 - Cannot see draft assessments
 - Cannot create or modify assessments
 
 ### Professor
-**Navigation:** Dashboard, Assessments, Create Assessment, Question Bank, Live Monitor, Analytics, Leaderboard, Group Setup, Plagiarism
+**Navigation:** Dashboard, Assessments, Questions, Leaderboard, Notifications
 - Can create and manage assessments
-- Can add/remove/edit questions
-- Can toggle question visibility
-- Can view class analytics and student submissions
+- Can add/remove/edit questions (own questions only)
+- Can toggle question visibility (own questions only)
+- Can view student submissions (own assessments only)
+- Can view analytics for own assessments and enrolled students only
 
 ### Admin
-**Navigation:** Dashboard, User Management, Admin Management, Analytics, System Health, System Logs, Backups, Settings, Notifications
+**Navigation:** Dashboard, User Management, Admin Management, System Health, System Logs, Backups, Leaderboard, Notifications
 - Full user management
 - Can configure platform settings
 - Can manage backups and system health

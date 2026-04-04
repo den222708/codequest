@@ -1,7 +1,6 @@
 export type Role = 'student' | 'professor' | 'admin' | null;
 
 export type View =
-  | 'landing'
   | 'login'
   | 'signup'
   | 'forgot-password'
@@ -14,7 +13,6 @@ export type View =
   | 'editor'
   | 'results'
   | 'prof-dashboard'
-  | 'live-monitor'
   | 'create-assessment'
   | 'edit-assessment'
   | 'question-bank'
@@ -22,11 +20,7 @@ export type View =
   | 'edit-question'
   | 'assessments'
   | 'questions'
-  | 'group-setup'
-  | 'plagiarism'
-  | 'analytics'
   | 'leaderboard'
-  | 'admin-settings'
   | 'user-management'
   | 'system-logs'
   | 'system-health'
@@ -130,6 +124,9 @@ export interface Submission {
   assessmentId: string;
   questionId: string;
   studentId: string;
+  attemptId?: string;
+  studentName?: string;
+  questionTitle?: string;
   code: string;
   language: 'python' | 'javascript' | 'java' | 'cpp';
   status: 'pending' | 'accepted' | 'passed' | 'partial' | 'rejected' | 'failed' | 'error' | 'wrong_answer';
@@ -330,18 +327,6 @@ export interface TimerState {
   isPaused: boolean;
 }
 
-// Feedback Types
-export interface Feedback {
-  id: string;
-  submissionId: string;
-  professorId: string;
-  professorName: string;
-  comment: string;
-  rating?: number;
-  createdAt: string;
-  updatedAt?: string;
-}
-
 // Export Types
 export interface ExportOptions {
   format: 'pdf' | 'csv' | 'excel';
@@ -448,52 +433,6 @@ export const ROLE_PERMISSIONS: Record<string, RolePermissions> = {
     canViewSystemHealth: true,
   },
 };
-
-// Course Management Types
-export interface Course {
-  id: string;
-  code: string;           // e.g., "CS201"
-  name: string;           // e.g., "Data Structures"
-  description: string;
-  department: string;
-  credits: number;
-  status: 'active' | 'archived';
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Semester {
-  id: string;
-  courseId: string;
-  name: string;           // e.g., "Fall 2026"
-  year: number;
-  term: 'spring' | 'summer' | 'fall' | 'winter';
-  startDate: string;
-  endDate: string;
-  status: 'upcoming' | 'active' | 'completed';
-}
-
-export interface Lab {
-  id: string;
-  semesterId: string;
-  name: string;           // e.g., "Lab Section A"
-  schedule: string;       // e.g., "Mon/Wed 10:00 AM - 11:30 AM"
-  location: string;       // e.g., "Room 301, Engineering Building"
-  capacity: number;
-  professorId?: string;
-  professorName?: string;
-  parentLabId?: string;   // For recursive nesting (sub-labs)
-  status: 'active' | 'inactive';
-}
-
-export interface StudentGroup {
-  id: string;
-  labId: string;
-  name: string;           // e.g., "Group A" or "Morning Batch"
-  studentIds: string[];   // Array of student user IDs
-  createdAt: string;
-}
 
 export interface ClassInfo {
   id: string;

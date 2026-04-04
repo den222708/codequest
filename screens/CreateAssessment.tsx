@@ -120,7 +120,12 @@ const CreateAssessment: React.FC<Props> = ({ onBack, onSave, questions, editingA
   const canProceed = () => {
     if (step === 1) return title && description;
     if (step === 2) return selectedQuestions.length > 0;
-    if (step === 3) return startDate && startTime && endDate && endTime;
+    if (step === 3) {
+      if (!startDate || !startTime || !endDate || !endTime) return false;
+      const start = new Date(`${startDate}T${startTime}`);
+      const end = new Date(`${endDate}T${endTime}`);
+      return end > start;
+    }
     return false;
   };
 

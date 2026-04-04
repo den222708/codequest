@@ -122,6 +122,7 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
     
     if (isEditing && editingQuestion && onUpdate) {
       onUpdate(editingQuestion.id, questionData);
+      onBack();
     } else {
       onSave(questionData);
       onBack();
@@ -153,7 +154,12 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
             </button>
             <button
               onClick={handleSave}
-              disabled={!title || !description || !topic}
+              disabled={
+                !title || !description || !topic ||
+                (questionType === 'coding' && (!testCases.length || testCases.some(tc => !tc.expectedOutput.trim()))) ||
+                (questionType === 'mcq' && (mcqOptions.length < 2 || mcqOptions.some(o => !o.text.trim()) || !mcqOptions.some(o => o.isCorrect))) ||
+                ((questionType === 'short_answer' || questionType === 'true_false') && !correctAnswer.trim())
+              }
               className="px-6 py-2 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <span className="material-symbols-outlined text-lg">save</span>
@@ -176,7 +182,7 @@ const CreateQuestion: React.FC<Props> = ({ onBack, onSave, editingQuestion, onUp
             ].filter(tab => tab.show).map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`px-5 py-3 font-medium flex items-center gap-2 border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? 'border-primary text-primary'

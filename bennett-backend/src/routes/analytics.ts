@@ -3,8 +3,11 @@ import { getSupabaseAdmin } from "../lib/supabase.js";
 import { sendSuccess, sendError } from "../lib/response.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { cacheGet, cacheSet } from "../lib/cache.js";
+import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
+
+const log = createChildLogger({ module: "analytics" });
 
 const analytics = new Hono<AppEnv>();
 analytics.use("*", authMiddleware);
@@ -78,7 +81,10 @@ analytics.get("/leaderboard", async (c) => {
   }
 
   const { data, error } = await query;
-  if (error) return sendError(c, 500, error.message);
+  if (error) {
+    log.error({ err: error }, "Failed to fetch leaderboard");
+    return sendError(c, 500, "Failed to fetch leaderboard");
+  }
 
   const leaderboard = (data ?? []).map((row, index) => ({
     rank: index + 1,
@@ -105,6 +111,23 @@ analytics.get("/student/:id", async (c) => {
   }
 
   const supabase = getSupabaseAdmin();
+
+  // Teachers can only see stats for students in their classes
+  if (user.role === "teacher") {
+    const { data: teacherClasses } = await supabase
+      .from("classes").select("id").eq("teacher_id", user.id);
+    const classIds = (teacherClasses ?? []).map((c: any) => c.id);
+    if (classIds.length > 0) {
+      const { data: enrollments } = await supabase
+        .from("class_enrollments").select("student_id").in("class_id", classIds);
+      const studentIds = (enrollments ?? []).map((e: any) => e.student_id);
+      if (!studentIds.includes(studentId)) {
+        return sendError(c, 403, "Access denied: student not in your classes");
+      }
+    } else {
+      return sendError(c, 403, "Access denied: no classes assigned");
+    }
+  }
 
   let profile: any, attempts: any[] | null, submissions: any[] | null;
   try {
@@ -172,8 +195,17 @@ analytics.get("/student/:id", async (c) => {
 
 // ── GET /analytics/assessment/:id ─────────────────────────────────────
 analytics.get("/assessment/:id", requireRole("teacher", "admin"), async (c) => {
+  const user = c.get("user") as AuthUser;
   const assessmentId = c.req.param("id");
   const supabase = getSupabaseAdmin();
+
+  // Teachers can only view analytics for their own assessments
+  if (user.role === "teacher") {
+    const { data: assessment } = await supabase
+      .from("assessments").select("created_by").eq("id", assessmentId).single();
+    if (!assessment) return sendError(c, 404, "Assessment not found");
+    if (assessment.created_by !== user.id) return sendError(c, 403, "Access denied");
+  }
 
   const { data: attempts, error } = await supabase
     .from("assessment_attempts")
@@ -184,7 +216,7 @@ analytics.get("/assessment/:id", requireRole("teacher", "admin"), async (c) => {
     .eq("assessment_id", assessmentId)
     .order("score", { ascending: false });
 
-  if (error) return sendError(c, 500, error.message);
+  if (error) return sendError(c, 500, "Failed to fetch assessment analytics");
 
   const completed = (attempts ?? []).filter((a) => a.status === "completed");
   const scores = completed.map((a) => a.score);

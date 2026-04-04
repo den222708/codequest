@@ -1,4 +1,5 @@
 import { Assessment, Submission, User, AnalyticsData, PlagiarismResult } from '../types';
+import { escapeHtml } from '../utils/formatters';
 
 // Export service for generating PDF, CSV, and Excel exports
 
@@ -184,7 +185,7 @@ export const generatePrintableReport = (
 ): string => {
   const metaHtml = metadata
     ? Object.entries(metadata)
-        .map(([key, value]) => `<p><strong>${key}:</strong> ${value}</p>`)
+        .map(([key, value]) => `<p><strong>${escapeHtml(key)}:</strong> ${escapeHtml(value)}</p>`)
         .join('')
     : '';
   
@@ -221,7 +222,7 @@ export const generatePrintableReport = (
   </style>
 </head>
 <body>
-  <h1>${title}</h1>
+  <h1>${escapeHtml(title)}</h1>
   ${metaHtml ? `<div class="metadata">${metaHtml}</div>` : ''}
   ${content}
   <div class="footer">
@@ -273,10 +274,10 @@ export const exportAssessmentResultsPDF = (
     
     tableContent += `
       <tr>
-        <td>${user?.name || 'Unknown'}</td>
-        <td>${question?.title || 'Unknown'}</td>
+        <td>${escapeHtml(user?.name || 'Unknown')}</td>
+        <td>${escapeHtml(question?.title || 'Unknown')}</td>
         <td>${sub.score}/${sub.maxScore} (${percentage}%)</td>
-        <td class="${statusClass}">${sub.status.toUpperCase()}</td>
+        <td class="${statusClass}">${escapeHtml(sub.status.toUpperCase())}</td>
         <td>${(sub.executionTime ?? 0).toFixed(0)}ms</td>
         <td>${new Date(sub.submittedAt).toLocaleDateString()}</td>
       </tr>
@@ -365,10 +366,10 @@ export const exportStudentResultPDF = (
     
     content += `
       <tr>
-        <td>${question?.title || 'Unknown'}</td>
+        <td>${escapeHtml(question?.title || 'Unknown')}</td>
         <td>${sub.score}/${sub.maxScore}</td>
         <td>${testsPassed}/${totalTests}</td>
-        <td class="${statusClass}">${sub.status.toUpperCase()}</td>
+        <td class="${statusClass}">${escapeHtml(sub.status.toUpperCase())}</td>
       </tr>
     `;
   });
