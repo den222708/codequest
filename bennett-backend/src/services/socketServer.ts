@@ -35,6 +35,13 @@ import type {
 
 const log = createChildLogger({ module: "ws" });
 
+type RedisClientLike = {
+  connect: () => Promise<unknown>;
+  quit: () => Promise<unknown>;
+  duplicate: () => RedisClientLike;
+  on: (event: string, listener: (...args: unknown[]) => void) => void;
+};
+
 // ── In-memory session store ─────────────────────────────────────────────
 
 const sessions = new Map<string, MonitoringSessionState>(); // keyed by attemptId
@@ -162,6 +169,46 @@ function getSocketUser(socket: Socket): SocketUser {
 // ── Socket.IO Server Factory ────────────────────────────────────────────
 
 let io: SocketIOServer | null = null;
+let proctoringNamespace: Namespace<ClientToServerEvents, ServerToClientEvents> | null = null;
+let dashboardTimer: ReturnType<typeof setInterval> | null = null;
+let redisPubClient: RedisClientLike | null = null;
+let redisSubClient: RedisClientLike | null = null;
+
+async function setupRedisAdapter(server: SocketIOServer): Promise<void> {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return;
+
+  try {
+    const [{ createAdapter }, redisModule] = await Promise.all([
+      import("@socket.io/redis-adapter"),
+      import("redis"),
+    ]);
+
+    const pubClient = redisModule.createClient({ url: redisUrl }) as unknown as RedisClientLike;
+    const subClient = pubClient.duplicate();
+
+    pubClient.on("error", (err: unknown) => {
+      log.error({ err }, "Socket.IO Redis pub client error");
+    });
+    subClient.on("error", (err: unknown) => {
+      log.error({ err }, "Socket.IO Redis sub client error");
+    });
+
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+
+    server.adapter(createAdapter(pubClient as never, subClient as never));
+    redisPubClient = pubClient;
+    redisSubClient = subClient;
+
+    log.info({ redisUrl }, "Socket.IO Redis adapter enabled");
+  } catch (err) {
+    log.error({ err }, "Failed to initialize Socket.IO Redis adapter; continuing in single-node mode");
+  }
+}
+
+function setSocketSessionData(socket: Socket, session: MonitoringSessionState): void {
+  (socket.data as Record<string, unknown>).monitoringSession = session;
+}
 
 export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]): SocketIOServer {
   io = new SocketIOServer(httpServer, {
@@ -175,8 +222,11 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
     transports: ["websocket"],
   });
 
+  void setupRedisAdapter(io);
+
   // ── Proctoring Namespace (students) ───────────────────────────────────
   const proctoring = io.of("/proctoring") as unknown as Namespace<ClientToServerEvents, ServerToClientEvents>;
+  proctoringNamespace = proctoring;
 
   // Apply JWT auth middleware to proctoring namespace
   (proctoring as any).use(authenticateSocket);
@@ -210,6 +260,7 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
 
       sessions.set(attemptId, session);
       socketToAttempt.set(socket.id, attemptId);
+      setSocketSessionData(socket as unknown as Socket, session);
 
       // Join Socket.IO room for this assessment
       socket.join(`assessment:${assessmentId}`);
@@ -225,6 +276,11 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
 
       // Notify admin namespace
       emitToAdminRoom(assessmentId, 'monitor:join', { assessmentId, session });
+      emitToAdminRoom(assessmentId, 'monitor:update', {
+        assessmentId,
+        sessions: [session],
+        timestamp: new Date().toISOString(),
+      });
 
       // Deliver any queued instructions
       const pending = instructionQueues.get(attemptId) ?? [];
@@ -250,6 +306,13 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
       session.isFullscreen = payload.isFullscreen;
       session.isOnline = payload.isOnline;
       session.status = computeStatus(session);
+      setSocketSessionData(socket as unknown as Socket, session);
+
+      emitToAdminRoom(payload.assessmentId, 'monitor:update', {
+        assessmentId: payload.assessmentId,
+        sessions: [session],
+        timestamp: new Date().toISOString(),
+      });
 
       // Buffer heartbeat (only every 5th to reduce DB writes)
       if (payload.seq % 5 === 0) {
@@ -270,6 +333,13 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
 
       incrementViolation(session.violations, payload.type);
       session.status = computeStatus(session);
+      setSocketSessionData(socket as unknown as Socket, session);
+
+      emitToAdminRoom(payload.assessmentId, 'monitor:update', {
+        assessmentId: payload.assessmentId,
+        sessions: [session],
+        timestamp: new Date().toISOString(),
+      });
 
       // Always persist violations
       bufferEvent({
@@ -351,11 +421,11 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
     log.debug({ socketId: socket.id, userId: authedUser.id, role: authedUser.role }, "admin client connected");
 
     // ── monitor:subscribe ──────────────────────────────────
-    socket.on("monitor:subscribe", ({ assessmentId }) => {
+    socket.on("monitor:subscribe", async ({ assessmentId }) => {
       socket.join(`admin:${assessmentId}`);
 
       // Send current snapshot
-      const assessmentSessions = getAssessmentSessions(assessmentId);
+      const assessmentSessions = await getAssessmentSessionSnapshot(assessmentId);
       socket.emit('monitor:update', {
         assessmentId,
         sessions: assessmentSessions,
@@ -412,23 +482,25 @@ export function createSocketServer(httpServer: HttpServer, corsOrigins: string[]
   // Flush event buffer periodically
   flushTimer = setInterval(() => flushEvents(), FLUSH_INTERVAL_MS);
 
-  // Push dashboard updates to admin rooms every 3 seconds
-  setInterval(() => {
-    // Group sessions by assessmentId
-    const byAssessment = new Map<string, MonitoringSessionState[]>();
-    for (const session of sessions.values()) {
-      const arr = byAssessment.get(session.assessmentId) ?? [];
-      arr.push(session);
-      byAssessment.set(session.assessmentId, arr);
-    }
+  // Push dashboard updates to subscribed admin rooms every 3 seconds
+  dashboardTimer = setInterval(() => {
+    void (async () => {
+      const assessmentIds = new Set<string>();
+      for (const room of admin.adapter.rooms.keys()) {
+        if (room.startsWith("admin:")) {
+          assessmentIds.add(room.slice("admin:".length));
+        }
+      }
 
-    for (const [assessmentId, assessmentSessions] of byAssessment) {
-      admin.to(`admin:${assessmentId}`).emit('monitor:update', {
-        assessmentId,
-        sessions: assessmentSessions,
-        timestamp: new Date().toISOString(),
-      });
-    }
+      for (const assessmentId of assessmentIds) {
+        const snapshot = await getAssessmentSessionSnapshot(assessmentId);
+        admin.to(`admin:${assessmentId}`).emit('monitor:update', {
+          assessmentId,
+          sessions: snapshot,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    })();
   }, 3_000);
 
   log.info({ namespaces: ["/proctoring", "/admin"] }, "Socket.IO server initialized");
@@ -445,6 +517,11 @@ function handleStudentDisconnect(socketId: string, reason: string): void {
   const session = sessions.get(attemptId);
   if (session) {
     session.status = 'disconnected';
+
+    const liveSocket = proctoringNamespace?.sockets.get(socketId);
+    if (liveSocket) {
+      setSocketSessionData(liveSocket as unknown as Socket, session);
+    }
 
     // Buffer leave event
     bufferEvent({
@@ -490,6 +567,34 @@ function getAssessmentSessions(assessmentId: string): MonitoringSessionState[] {
   return result;
 }
 
+export async function getAssessmentSessionSnapshot(assessmentId: string): Promise<MonitoringSessionState[]> {
+  const merged = new Map<string, MonitoringSessionState>();
+
+  for (const session of getAssessmentSessions(assessmentId)) {
+    merged.set(session.attemptId, session);
+  }
+
+  if (proctoringNamespace) {
+    try {
+      const sockets = await proctoringNamespace
+        .in(`assessment:${assessmentId}`)
+        .fetchSockets();
+
+      for (const remoteSocket of sockets) {
+        const session = (remoteSocket.data as Record<string, unknown>)
+          .monitoringSession as MonitoringSessionState | undefined;
+        if (session) {
+          merged.set(session.attemptId, session);
+        }
+      }
+    } catch (err) {
+      log.error({ err, assessmentId }, "Failed to fetch distributed session snapshot");
+    }
+  }
+
+  return Array.from(merged.values());
+}
+
 // ── Exports for testing / monitoring ────────────────────────────────────
 
 export function getSessionCount(): number {
@@ -510,12 +615,26 @@ export function getIOInstance(): SocketIOServer | null {
 
 export async function shutdown(): Promise<void> {
   if (flushTimer) clearInterval(flushTimer);
+  if (dashboardTimer) clearInterval(dashboardTimer);
+  flushTimer = null;
+  dashboardTimer = null;
   await flushEvents();
+
+  if (redisPubClient) {
+    await redisPubClient.quit().catch(() => undefined);
+    redisPubClient = null;
+  }
+  if (redisSubClient) {
+    await redisSubClient.quit().catch(() => undefined);
+    redisSubClient = null;
+  }
+
   if (io) {
     io.disconnectSockets(true);
     io.close();
     io = null;
   }
+  proctoringNamespace = null;
   sessions.clear();
   socketToAttempt.clear();
   instructionQueues.clear();

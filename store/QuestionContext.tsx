@@ -7,6 +7,7 @@ export interface QuestionContextType {
   questions: Question[];
   editingQuestion: Question | null;
   addQuestion: (question: Omit<Question, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => Promise<void>;
+  importQuestions: (questions: Omit<Question, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>[]) => Promise<{ imported: number; failed: number }>;
   updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
   deleteQuestion: (id: string) => Promise<void>;
   setEditingQuestion: (question: Question | null) => void;
@@ -48,6 +49,44 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [_addNotification]);
 
+  const importQuestions = useCallback(async (items: Omit<Question, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>[]) => {
+    let imported = 0;
+    let failed = 0;
+    const created: Question[] = [];
+
+    for (const item of items) {
+      try {
+        const question = await questionService.create(item);
+        created.push(question);
+        imported++;
+      } catch {
+        failed++;
+      }
+    }
+
+    if (created.length > 0) {
+      setQuestions(prev => [...prev, ...created]);
+    }
+
+    if (imported > 0) {
+      _addNotification.current?.({
+        type: 'success',
+        title: 'Import Complete',
+        message: `${imported} question${imported === 1 ? '' : 's'} imported successfully.`,
+      });
+    }
+
+    if (failed > 0) {
+      _addNotification.current?.({
+        type: 'warning',
+        title: 'Import Partial',
+        message: `${failed} question${failed === 1 ? '' : 's'} failed to import.`,
+      });
+    }
+
+    return { imported, failed };
+  }, [_addNotification]);
+
   const updateQuestion = useCallback(async (id: string, updates: Partial<Question>) => {
     try {
       const updated = await questionService.update(id, updates);
@@ -75,6 +114,7 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
       questions,
       editingQuestion,
       addQuestion,
+      importQuestions,
       updateQuestion,
       deleteQuestion,
       setEditingQuestion,

@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-04-04T20:10:00Z] - Protocol Contract Fixes, Scale-Out Hardening, and Docs Synchronization
+
+### High Severity Fixes
+
+- **WebSocket auth contract fixed** (`services/realtimeService.ts`, `bennett-backend/src/services/socketServer.ts`): Frontend now sends `auth.token` in Socket.IO handshake for both `/proctoring` and `/admin` namespaces; client transport is websocket-only and now matches server transport policy.
+- **SSE execution contract fixed** (`services/executeService.ts`, `bennett-backend/src/services/programizProxy.ts`, `bennett-backend/src/services/judge0Executor.ts`): Backend now emits typed SSE events (`stdout`, `stderr`, `exit`), and frontend parser supports both new typed payloads and legacy `{output,error}` payloads during compatibility window.
+
+### Medium Severity Fixes
+
+- **Distributed rate limiting support added** (`bennett-backend/src/middleware/rateLimit.ts`, `bennett-backend/.env.example`): Added optional Redis-backed store (`REDIS_URL`) with graceful fallback to in-memory buckets.
+- **Distributed Socket.IO support added** (`bennett-backend/src/services/socketServer.ts`, `bennett-backend/src/routes/system.ts`): Added optional Socket.IO Redis adapter and distributed live-session snapshots for monitoring endpoints.
+- **API prefix docs/runtime drift fixed** (`bennett-backend/src/app.ts`, `bennett-backend/README.md`, `bennett-backend/SUBDOMAIN_SETUP.md`): All deployment/API references now consistently use `/api/v1`.
+
+### Low Severity Fixes
+
+- **Single dependency pipeline restored** (`index.html`, `index.css`, `tailwind.config.js`, `postcss.config.js`, `package.json`): Removed Tailwind CDN and importmap usage; Tailwind/PostCSS now run through the package-managed Vite build.
+- **Question import flow implemented** (`screens/QuestionBank.tsx`, `routes/index.tsx`, `store/QuestionContext.tsx`, `store/AppContext.tsx`): Import button now parses JSON, normalizes data, imports via API-backed context methods, and reports success/partial failures.
+
+### Verification
+
+- Frontend: `npx tsc --noEmit`, `npm run test:run`, `npm run build` (pass)
+- Backend: `npm run typecheck`, `npm run test:run`, `npm run build` (pass)
+
 ## [2026-03-20T23:30:00Z] - Deep Audit Fix Pass: IDORs, Error Hardening, UX Safety (22 issues)
 
 ### Critical IDOR Fixes (Backend)

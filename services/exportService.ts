@@ -337,7 +337,7 @@ export const exportStudentResultPDF = (
   let content = `
     <div style="text-align: center; margin-bottom: 30px;">
       <h2 style="color: ${passed ? '#22c55e' : '#c01530'};">
-        ${passed ? '✓ PASSED' : '✗ NOT PASSED'}
+        ${passed ? 'PASSED' : 'NOT PASSED'}
       </h2>
       <p style="font-size: 24px; margin: 20px 0;">
         <strong>Final Score: ${totalScore}/${maxScore} (${percentage}%)</strong>

@@ -1,42 +1,137 @@
 import { Context, Next } from "hono";
+import { createChildLogger } from "../lib/logger.js";
+
+const log = createChildLogger({ module: "rateLimit" });
 
 // ── Environment-driven defaults ───────────────────────────────────────
 // These read from process.env at module load time; values in .env.example:
 //   RATE_LIMIT_GLOBAL=100   RATE_LIMIT_AUTH=10   RATE_LIMIT_EXECUTE=20
 export const RATE_LIMITS = {
-  GLOBAL:  parseInt(process.env.RATE_LIMIT_GLOBAL  ?? "100", 10),
-  AUTH:    parseInt(process.env.RATE_LIMIT_AUTH     ?? "10",  10),
-  EXECUTE: parseInt(process.env.RATE_LIMIT_EXECUTE ?? "20",  10),
+  GLOBAL: parseInt(process.env.RATE_LIMIT_GLOBAL ?? "100", 10),
+  AUTH: parseInt(process.env.RATE_LIMIT_AUTH ?? "10", 10),
+  EXECUTE: parseInt(process.env.RATE_LIMIT_EXECUTE ?? "20", 10),
 } as const;
+
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetAt: number;
+}
+
+interface RateLimitStore {
+  hit(key: string, maxRequests: number, windowMs: number): Promise<RateLimitResult>;
+}
 
 interface RateLimitEntry {
   count: number;
   resetAt: number;
 }
 
-const buckets = new Map<string, RateLimitEntry>();
+class InMemoryRateLimitStore implements RateLimitStore {
+  private readonly buckets = new Map<string, RateLimitEntry>();
 
-// Cleanup expired entries every 60s
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of buckets) {
-    if (entry.resetAt <= now) buckets.delete(key);
-  }
-}, 60_000);
+  constructor() {
+    const cleanupTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [key, entry] of this.buckets) {
+        if (entry.resetAt <= now) this.buckets.delete(key);
+      }
+    }, 60_000);
 
-function checkLimit(key: string, maxRequests: number, windowMs: number): { allowed: boolean; remaining: number; resetAt: number } {
-  const now = Date.now();
-  const entry = buckets.get(key);
-
-  if (!entry || entry.resetAt <= now) {
-    const resetAt = now + windowMs;
-    buckets.set(key, { count: 1, resetAt });
-    return { allowed: true, remaining: maxRequests - 1, resetAt };
+    if (typeof cleanupTimer.unref === "function") {
+      cleanupTimer.unref();
+    }
   }
 
-  entry.count++;
-  const remaining = Math.max(0, maxRequests - entry.count);
-  return { allowed: entry.count <= maxRequests, remaining, resetAt: entry.resetAt };
+  async hit(key: string, maxRequests: number, windowMs: number): Promise<RateLimitResult> {
+    const now = Date.now();
+    const entry = this.buckets.get(key);
+
+    if (!entry || entry.resetAt <= now) {
+      const resetAt = now + windowMs;
+      this.buckets.set(key, { count: 1, resetAt });
+      return { allowed: true, remaining: maxRequests - 1, resetAt };
+    }
+
+    entry.count++;
+    return {
+      allowed: entry.count <= maxRequests,
+      remaining: Math.max(0, maxRequests - entry.count),
+      resetAt: entry.resetAt,
+    };
+  }
+}
+
+const memoryStore = new InMemoryRateLimitStore();
+
+let redisStorePromise: Promise<RateLimitStore | null> | null = null;
+
+function createRedisRateLimitStore(): Promise<RateLimitStore | null> {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return Promise.resolve(null);
+
+  return (async () => {
+    try {
+      const redisModule = await import("redis");
+      const client = redisModule.createClient({ url: redisUrl });
+
+      client.on("error", (err: unknown) => {
+        log.error({ err }, "Redis rate limiter client error");
+      });
+
+      await client.connect();
+      log.info({ redisUrl }, "Redis-backed rate limiter enabled");
+
+      return {
+        async hit(key: string, maxRequests: number, windowMs: number): Promise<RateLimitResult> {
+          const redisKey = `rl:${key}`;
+
+          const count = await client.incr(redisKey);
+          if (count === 1) {
+            await client.pExpire(redisKey, windowMs);
+          }
+
+          let ttlMs = await client.pTTL(redisKey);
+          if (ttlMs <= 0) {
+            await client.pExpire(redisKey, windowMs);
+            ttlMs = windowMs;
+          }
+
+          return {
+            allowed: count <= maxRequests,
+            remaining: Math.max(0, maxRequests - count),
+            resetAt: Date.now() + ttlMs,
+          };
+        },
+      } satisfies RateLimitStore;
+    } catch (err) {
+      log.error({ err }, "Failed to initialize Redis rate limiter; falling back to in-memory store");
+      return null;
+    }
+  })();
+}
+
+async function getRateLimitStore(): Promise<RateLimitStore> {
+  if (!redisStorePromise) {
+    redisStorePromise = createRedisRateLimitStore();
+  }
+
+  const redisStore = await redisStorePromise;
+  return redisStore ?? memoryStore;
+}
+
+async function checkLimit(
+  key: string,
+  maxRequests: number,
+  windowMs: number,
+): Promise<RateLimitResult> {
+  const store = await getRateLimitStore();
+  try {
+    return await store.hit(key, maxRequests, windowMs);
+  } catch (err) {
+    log.error({ err, key }, "Rate limit store failure; falling back to in-memory bucket");
+    return memoryStore.hit(key, maxRequests, windowMs);
+  }
 }
 
 function getClientIp(c: Context): string {
@@ -55,7 +150,7 @@ export function rateLimit(opts: { max: number; windowMs?: number; keyPrefix?: st
   return async (c: Context, next: Next) => {
     const ip = getClientIp(c);
     const key = `${keyPrefix}:${ip}`;
-    const result = checkLimit(key, max, windowMs);
+    const result = await checkLimit(key, max, windowMs);
 
     c.header("X-RateLimit-Limit", String(max));
     c.header("X-RateLimit-Remaining", String(result.remaining));
@@ -64,7 +159,7 @@ export function rateLimit(opts: { max: number; windowMs?: number; keyPrefix?: st
     if (!result.allowed) {
       return c.json(
         { success: false, error: "Too many requests. Please try again later." },
-        429
+        429,
       );
     }
 
@@ -79,7 +174,7 @@ export function userRateLimit(opts: { max: number; windowMs?: number; keyPrefix?
   return async (c: Context, next: Next) => {
     const user = c.get("user") as { id: string } | undefined;
     const key = `${keyPrefix}:${user?.id ?? getClientIp(c)}`;
-    const result = checkLimit(key, max, windowMs);
+    const result = await checkLimit(key, max, windowMs);
 
     c.header("X-RateLimit-Limit", String(max));
     c.header("X-RateLimit-Remaining", String(result.remaining));
@@ -88,7 +183,7 @@ export function userRateLimit(opts: { max: number; windowMs?: number; keyPrefix?
     if (!result.allowed) {
       return c.json(
         { success: false, error: "Rate limit exceeded. Please slow down." },
-        429
+        429,
       );
     }
 

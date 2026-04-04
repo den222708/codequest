@@ -8,15 +8,17 @@ interface Props {
   onDeleteQuestion: (id: string) => void;
   onToggleVisibility: (id: string, visible: boolean) => void;
   onEditQuestion?: (id: string) => void;
+  onImportQuestions?: (file: File) => Promise<void>;
 }
 
-const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion, onToggleVisibility, onEditQuestion }) => {
+const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion, onToggleVisibility, onEditQuestion, onImportQuestions }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
   const [filterTopic, setFilterTopic] = useState<string>('all');
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [deleteModalId, setDeleteModalId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const topics = [...new Set(questions.map(q => q.topic))];
@@ -62,21 +64,30 @@ const QuestionBank: React.FC<Props> = ({ questions, onNavigate, onDeleteQuestion
             type="file"
             accept=".json"
             className="hidden"
-            onChange={(e) => {
+            onChange={async (e) => {
               const file = e.target.files?.[0];
               if (!file) return;
               // Reset input so the same file can be re-selected
               e.target.value = '';
-              // TODO: wire to an import handler prop when backend supports it
-              console.warn('Question import not yet implemented. File selected:', file.name);
+              if (!onImportQuestions) {
+                console.warn('Question import handler is not configured. File selected:', file.name);
+                return;
+              }
+              setImporting(true);
+              try {
+                await onImportQuestions(file);
+              } finally {
+                setImporting(false);
+              }
             }}
           />
           <button
+            disabled={importing}
             onClick={() => importInputRef.current?.click()}
-            className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium"
+            className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-lg">upload</span>
-            Import
+            {importing ? 'Importing...' : 'Import'}
           </button>
           <button
             onClick={() => onNavigate('create-question')}

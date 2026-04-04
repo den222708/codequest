@@ -293,6 +293,7 @@ export function executeCodeStream(
     async start(controller) {
       let closed = false;
       let executionSucceeded = false;
+      let exitSent = false;
 
       function close() {
         if (!closed) {
@@ -303,6 +304,12 @@ export function executeCodeStream(
             // already closed
           }
         }
+      }
+
+      function emitExit(code: number): void {
+        if (closed || exitSent) return;
+        exitSent = true;
+        controller.enqueue(sseData({ type: "exit", code }));
       }
 
       // Acquire concurrency slot
@@ -371,13 +378,14 @@ export function executeCodeStream(
               ? String((data as { output: unknown }).output)
               : String(data);
 
-          controller.enqueue(sseData({ output: text }));
+          controller.enqueue(sseData({ type: "stdout", data: text }));
 
           if (
             text.includes("=== Code Execution Successful ===") ||
             text.includes("=== Code Execution Failed ===")
           ) {
             executionSucceeded = true;
+            emitExit(text.includes("Successful") ? 0 : 1);
             sio.disconnect();
           }
         });
@@ -385,9 +393,11 @@ export function executeCodeStream(
         sio.on("disconnect", () => {
           if (executionSucceeded) {
             circuitBreaker.recordSuccess();
+            emitExit(0);
           } else if (!closed) {
             // Disconnected without completing — treat as infra failure
             circuitBreaker.recordFailure();
+            emitExit(1);
           }
           releaseOnce();
           close();
@@ -397,8 +407,9 @@ export function executeCodeStream(
           circuitBreaker.recordFailure();
           if (!closed) {
             controller.enqueue(
-              sseData({ error: `Connection failed: ${err.message}` })
+              sseData({ type: "stderr", data: `Connection failed: ${err.message}` })
             );
+            emitExit(1);
           }
           releaseOnce();
           close();
@@ -407,7 +418,8 @@ export function executeCodeStream(
         setTimeout(() => {
           if (!closed) {
             circuitBreaker.recordFailure();
-            controller.enqueue(sseData({ error: "Execution timed out" }));
+            controller.enqueue(sseData({ type: "stderr", data: "Execution timed out" }));
+            emitExit(1);
             sio.disconnect();
             releaseOnce();
             close();
@@ -419,9 +431,11 @@ export function executeCodeStream(
         if (!closed) {
           controller.enqueue(
             sseData({
-              error: `Unexpected error: ${err instanceof Error ? err.message : String(err)}`,
+              type: "stderr",
+              data: `Unexpected error: ${err instanceof Error ? err.message : String(err)}`,
             })
           );
+          emitExit(1);
         }
         close();
       }

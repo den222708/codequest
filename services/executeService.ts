@@ -96,13 +96,25 @@ export const executeService = {
           if (!jsonStr) continue;
           try {
             const event = JSON.parse(jsonStr);
-            if (event.type === 'stdout') stdout += event.data;
-            else if (event.type === 'stderr') stderr += event.data;
-            else if (event.type === 'exit') exitCode = event.code ?? null;
+            if (event.type === 'stdout') {
+              stdout += event.data ?? '';
+            } else if (event.type === 'stderr') {
+              stderr += event.data ?? '';
+            } else if (event.type === 'exit') {
+              exitCode = event.code ?? null;
+            } else if (typeof event.output === 'string') {
+              stdout += event.output;
+            } else if (typeof event.error === 'string') {
+              stderr += event.error;
+            }
           } catch {
             // skip malformed JSON
           }
         }
+      }
+
+      if (exitCode === null) {
+        exitCode = stderr ? 1 : 0;
       }
 
       return {

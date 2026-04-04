@@ -12,6 +12,7 @@
 import { io, Socket } from 'socket.io-client';
 import { LiveUpdate, ActiveSession } from '../types';
 import type { ViolationType } from './monitoringService';
+import { tokenStore } from './apiClient';
 
 export type { ViolationType };
 
@@ -106,6 +107,10 @@ function getBaseUrl(): string {
   return 'http://localhost:3001';
 }
 
+function getSocketToken(): string | null {
+  return tokenStore.getAccessToken();
+}
+
 // ── Student Client ──────────────────────────────────────────────────────
 
 class StudentMonitoringClient {
@@ -123,12 +128,19 @@ class StudentMonitoringClient {
   connect(payload: StudentJoinPayload): void {
     if (this.socket?.connected) return;
 
+    const token = getSocketToken();
+    if (!token) {
+      console.warn('[ws/student] cannot connect without access token');
+      return;
+    }
+
     this.attemptId = payload.attemptId;
     this.assessmentId = payload.assessmentId;
 
     this.socket = io(`${getBaseUrl()}/proctoring`, {
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],
       withCredentials: true,
+      auth: { token },
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
@@ -248,12 +260,19 @@ class AdminMonitoringClient {
   private leaveCallbacks: Array<(data: { assessmentId: string; attemptId: string; reason: string }) => void> = [];
 
   /** Connect to the /admin namespace */
-  connect(): void {
-    if (this.socket?.connected) return;
+  connect(): boolean {
+    if (this.socket?.connected) return true;
+
+    const token = getSocketToken();
+    if (!token) {
+      console.warn('[ws/admin] cannot connect without access token');
+      return false;
+    }
 
     this.socket = io(`${getBaseUrl()}/admin`, {
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],
       withCredentials: true,
+      auth: { token },
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
@@ -286,6 +305,8 @@ class AdminMonitoringClient {
     this.socket.on('disconnect', (reason) => {
       console.log('[ws/admin] disconnected:', reason);
     });
+
+    return true;
   }
 
   /** Disconnect from admin monitoring */
@@ -370,12 +391,23 @@ class RealtimeService {
   /** Connect admin monitoring (for backward compatibility) */
   connect(): void {
     if (this.isConnected) return;
+    const started = this.admin.connect();
+    if (!started) return;
     this.isConnected = true;
-    this.admin.connect();
 
     // Wire admin dashboard updates to legacy ActiveSession format
     this.admin.onDashboardUpdate((update) => {
       this.syncSessionsFromDashboard(update);
+    });
+
+    this.admin.onStudentJoin(({ session }) => {
+      this.activeSessions.set(session.attemptId, this.toLegacySession(session));
+      this.emitSessionUpdate();
+    });
+
+    this.admin.onStudentLeave(({ attemptId }) => {
+      this.activeSessions.delete(attemptId);
+      this.emitSessionUpdate();
     });
   }
 
@@ -420,30 +452,35 @@ class RealtimeService {
   private syncSessionsFromDashboard(update: MonitoringDashboardUpdate): void {
     // Convert MonitoringSessionState → ActiveSession
     for (const ws of update.sessions) {
-      const legacy: ActiveSession = {
-        id: ws.attemptId,
-        assessmentId: ws.assessmentId,
-        studentId: ws.studentId,
-        studentName: ws.studentName,
-        avatar: '',
-        startedAt: ws.joinedAt,
-        currentQuestion: ws.questionIndex + 1,
-        totalQuestions: 0, // not tracked server-side
-        submittedQuestions: 0,
-        status: ws.status === 'flagged' || ws.status === 'suspicious'
-          ? 'suspicious'
-          : ws.status === 'disconnected'
-            ? 'completed'
-            : ws.status === 'idle' ? 'idle' : 'active',
-        lastActivity: ws.lastHeartbeat,
-        ipAddress: '',
-        tabSwitches: ws.violations.tabSwitches,
-        copyPasteCount: ws.violations.pasteCount,
-      };
-      this.activeSessions.set(ws.attemptId, legacy);
+      this.activeSessions.set(ws.attemptId, this.toLegacySession(ws));
     }
 
     this.emitSessionUpdate();
+  }
+
+  private toLegacySession(ws: MonitoringSessionState): ActiveSession {
+    return {
+      id: ws.attemptId,
+      assessmentId: ws.assessmentId,
+      studentId: ws.studentId,
+      studentName: ws.studentName,
+      avatar: '',
+      startedAt: ws.joinedAt,
+      currentQuestion: ws.questionIndex + 1,
+      totalQuestions: 0,
+      submittedQuestions: 0,
+      status: ws.status === 'flagged' || ws.status === 'suspicious'
+        ? 'suspicious'
+        : ws.status === 'disconnected'
+          ? 'completed'
+          : ws.status === 'idle'
+            ? 'idle'
+            : 'active',
+      lastActivity: ws.lastHeartbeat,
+      ipAddress: '',
+      tabSwitches: ws.violations.tabSwitches,
+      copyPasteCount: ws.violations.pasteCount,
+    };
   }
 
   private emitSessionUpdate(): void {

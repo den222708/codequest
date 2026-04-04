@@ -8,6 +8,10 @@ This repository contains:
 - Backend API (`Hono + Supabase + Socket.IO`) in `bennett-backend`
 - Canonical Supabase schema + seed script in `bennett-backend/supabase/master.sql`
 
+## Update log
+
+- `2026-04-04T20:10:00Z`: Closed protocol/runtime findings — Socket.IO auth token handshake alignment, typed SSE execution events, `/api/v1` docs synchronization, optional Redis-backed distributed rate limiting and Socket.IO adapter, package-managed Tailwind/PostCSS migration, and Question Bank JSON import wiring.
+
 ## Core capabilities
 
 - Role-based access control for `student`, `professor` (backend `teacher`), and `admin`
@@ -16,6 +20,8 @@ This repository contains:
 - Real execution pipeline with Programiz-first execution and optional Judge0 fallback
 - Plagiarism scanning with server-side winnowing fingerprints
 - Real-time proctoring/monitoring via Socket.IO namespaces (`/proctoring`, `/admin`)
+- Question Bank JSON import pipeline with validation/normalization and import result notifications
+- Optional distributed runtime mode with `REDIS_URL` for rate limiting and Socket.IO fan-out
 - Notifications, activity logs, backups, system health, and leaderboard endpoints
 - Security hardening: JWT auth, lockout, token blacklist, session timeout, scrypt password history, RLS, WebSocket JWT auth, IP restriction enforcement, notification link sanitization (relative paths only), student question-data filtering, teacher IDOR prevention (submissions, plagiarism, analytics, question visibility), generic API error responses (no DB leak)
 
@@ -105,6 +111,9 @@ FRONTEND_URL=http://localhost:5173
 RATE_LIMIT_GLOBAL=100
 RATE_LIMIT_AUTH=10
 RATE_LIMIT_EXECUTE=20
+
+# Optional distributed runtime (recommended for multi-instance deploys)
+# REDIS_URL=redis://localhost:6379
 
 # Execution backend: programiz or judge0
 EXECUTION_BACKEND=programiz
@@ -255,6 +264,9 @@ FRONTEND_URL=https://codequest.qzz.io
 RATE_LIMIT_GLOBAL=100
 RATE_LIMIT_AUTH=10
 RATE_LIMIT_EXECUTE=20
+
+# Optional distributed runtime
+# REDIS_URL=redis://localhost:6379
 
 EXECUTION_BACKEND=programiz
 # Optional Judge0 fallback

@@ -1654,7 +1654,7 @@ const assessments: AssessmentSeed[] = [
 // ═══════════════════════════════════════════════════════════════════════
 
 async function main() {
-  console.log("🌱 Seeding DSA questions and assessments...\n");
+  console.log("[seed] Seeding DSA questions and assessments...\n");
 
   const adminId = await getAdminUserId();
   console.log(`Using admin user: ${adminId}\n`);
@@ -1685,18 +1685,18 @@ async function main() {
       .single();
 
     if (error) {
-      console.error(`  ✗ Failed to insert "${q.title}": ${error.message}`);
+      console.error(`  [error] Failed to insert "${q.title}": ${error.message}`);
       continue;
     }
 
-    console.log(`  ✓ ${q.topic} / ${q.title} (${q.difficulty}) → ${data.id}`);
+    console.log(`  [ok] ${q.topic} / ${q.title} (${q.difficulty}) -> ${data.id}`);
 
     const topicIds = questionIds.get(q.topic) || [];
     topicIds.push(data.id);
     questionIds.set(q.topic, topicIds);
   }
 
-  console.log(`\n✓ Inserted ${Array.from(questionIds.values()).flat().length} questions\n`);
+  console.log(`\n[ok] Inserted ${Array.from(questionIds.values()).flat().length} questions\n`);
 
   // 2. Insert assessments
   const startDate = new Date();
@@ -1711,7 +1711,7 @@ async function main() {
     }
 
     if (qIds.length === 0) {
-      console.error(`  ✗ No questions for assessment "${a.title}"`);
+      console.error(`  [error] No questions for assessment "${a.title}"`);
       continue;
     }
 
@@ -1752,7 +1752,7 @@ async function main() {
       .single();
 
     if (error) {
-      console.error(`  ✗ Failed to create assessment "${a.title}": ${error.message}`);
+      console.error(`  [error] Failed to create assessment "${a.title}": ${error.message}`);
       continue;
     }
 
@@ -1769,13 +1769,13 @@ async function main() {
       .insert(links);
 
     if (linkErr) {
-      console.error(`  ✗ Failed to link questions for "${a.title}": ${linkErr.message}`);
+      console.error(`  [error] Failed to link questions for "${a.title}": ${linkErr.message}`);
     } else {
-      console.log(`  ✓ Assessment: "${a.title}" (${qIds.length} questions, ${actualPoints} pts) → ${assessment.id}`);
+      console.log(`  [ok] Assessment: "${a.title}" (${qIds.length} questions, ${actualPoints} pts) -> ${assessment.id}`);
     }
   }
 
-  console.log("\n🎉 Seeding complete!");
+  console.log("\n[done] Seeding complete!");
 }
 
 main().catch(console.error);

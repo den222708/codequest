@@ -6,7 +6,7 @@ import { cacheStats } from "../lib/cache.js";
 import { getExecutionStats, getActiveBackend, setActiveBackend, type ExecutionBackend } from "../services/executionDispatcher.js";
 import { createNotification } from "../services/notificationService.js";
 import { detectPlagiarism, type SubmissionInput } from "../services/plagiarismDetector.js";
-import { getAllSessions } from "../services/socketServer.js";
+import { getAssessmentSessionSnapshot } from "../services/socketServer.js";
 import { createChildLogger } from "../lib/logger.js";
 import type { AuthUser } from "../middleware/auth.js";
 import type { AppEnv } from "../lib/env.js";
@@ -638,12 +638,12 @@ system.post("/monitoring/:assessmentId/events", async (c) => {
 });
 
 // ── GET /system/monitoring/:assessmentId/sessions ───────────────────
-// Get current live sessions from in-memory WebSocket store (admin only)
+// Get current live sessions snapshot from WebSocket store (admin only)
 system.get("/monitoring/:assessmentId/sessions", requireRole("teacher", "admin"), async (c) => {
   const assessmentId = c.req.param("assessmentId");
+  if (!assessmentId) return sendError(c, 400, "Assessment ID is required");
 
-  const all = getAllSessions();
-  const assessmentSessions = all.filter(s => s.assessmentId === assessmentId);
+  const assessmentSessions = await getAssessmentSessionSnapshot(assessmentId);
 
   return sendSuccess(c, {
     sessions: assessmentSessions,

@@ -2,6 +2,10 @@
 
 Hono-based API backend for `bennett.codequest.qzz.io` with Supabase auth, Programiz code execution proxy, and anti-ban fingerprint rotation.
 
+## Update log
+
+- `2026-04-04T20:10:00Z`: Added typed SSE execution events (`stdout`/`stderr`/`exit`), optional Redis-backed distributed rate limiting (`REDIS_URL`), optional Socket.IO Redis adapter for multi-instance monitoring, and finalized `/api/v1` route-prefix documentation.
+
 ## Architecture
 
 ```
@@ -39,8 +43,12 @@ npm run dev
 | `PORT` | Server port (default: 3001) |
 | `CORS_ORIGINS` | Comma-separated allowed origins |
 | `FRONTEND_URL` | Frontend URL for password reset redirects |
+| `REDIS_URL` | Optional Redis URL for distributed rate limiting and Socket.IO adapter |
 
 ## API Routes
+
+All endpoints are mounted under `/api/v1`.
+Example: `/auth/login` below is served at `/api/v1/auth/login`.
 
 ### Auth (`/auth`)
 | Method | Path | Auth | Description |

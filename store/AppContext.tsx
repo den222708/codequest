@@ -44,6 +44,7 @@ export interface AppContextType {
   questions: Question[];
   editingQuestion: Question | null;
   addQuestion: (question: Omit<Question, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>) => Promise<void>;
+  importQuestions: (questions: Omit<Question, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>[]) => Promise<{ imported: number; failed: number }>;
   updateQuestion: (id: string, updates: Partial<Question>) => Promise<void>;
   deleteQuestion: (id: string) => Promise<void>;
   setEditingQuestion: (question: Question | null) => void;
@@ -202,6 +203,7 @@ export const useApp = (): AppContextType => {
     questions: questions.questions,
     editingQuestion: questions.editingQuestion,
     addQuestion: questions.addQuestion,
+    importQuestions: questions.importQuestions,
     updateQuestion: questions.updateQuestion,
     deleteQuestion: questions.deleteQuestion,
     setEditingQuestion: questions.setEditingQuestion,

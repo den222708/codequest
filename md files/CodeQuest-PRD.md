@@ -102,16 +102,16 @@ CodeQuest is a web-based platform designed to facilitate coding education and as
 
 | Feature | Student | Professor | Admin |
 |---------|---------|-----------|-------|
-| **Authentication** | ✅ | ✅ | ✅ |
-| **Dashboard** | ✅ | ✅ | ✅ |
-| **Attempt Quizzes/Questions** | ✅ | ✗ | ✗ |
-| **View Results** | ✅ | ✅ | ✅ |
-| **Create Assessments** | ✗ | ✅ | ✗ |
-| **Manage Question Bank** | ✗ | ✅ | ✗ |
-| **Toggle Question Visibility** | ✗ | ✅ | ✗ |
-| **Manage Users** | ✗ | ✗ | ✅ |
-| **View Analytics/Reports** | ✓ Personal | ✓ Class | ✅ System-wide |
-| **System Configuration** | ✗ | ✗ | ✅ |
+| **Authentication** | Yes | Yes | Yes |
+| **Dashboard** | Yes | Yes | Yes |
+| **Attempt Quizzes/Questions** | Yes | No | No |
+| **View Results** | Yes | Yes | Yes |
+| **Create Assessments** | No | Yes | No |
+| **Manage Question Bank** | No | Yes | No |
+| **Toggle Question Visibility** | No | Yes | No |
+| **Manage Users** | No | No | Yes |
+| **View Analytics/Reports** | Personal only | Class only | System-wide |
+| **System Configuration** | No | No | Yes |
 
 ---
 
@@ -210,7 +210,7 @@ CodeQuest is a web-based platform designed to facilitate coding education and as
   - Reset code button (restore to original)
 
 - **Real-Time Feedback:**
-  - Test case results (✓ Passed / ✗ Failed)
+  - Test case results (Passed / Failed)
   - Execution time and memory usage
   - Compilation errors (if any)
   - Runtime errors with stack traces

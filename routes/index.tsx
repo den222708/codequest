@@ -38,6 +38,7 @@ import SystemLogs from '../screens/SystemLogs';
 import BackupManagement from '../screens/BackupManagement';
 import Notifications from '../screens/Notifications';
 import { demoAssessment } from '../data/demoModeData';
+import type { Question } from '../types';
 
 const DemoEntryPage: React.FC = () => {
   const { startDemoMode } = useApp();
@@ -170,6 +171,7 @@ const AppRoutes: React.FC = () => {
     updateUser,
     deleteUser,
     addQuestion,
+    importQuestions,
     updateQuestion,
     deleteQuestion,
     setEditingQuestion,
@@ -188,6 +190,7 @@ const AppRoutes: React.FC = () => {
     deleteBackup,
     markNotificationRead,
     clearNotifications,
+    addNotification,
   } = useApp();
 
   const navigate = useNavigate();
@@ -243,6 +246,108 @@ const AppRoutes: React.FC = () => {
   // Handle role selection (demo mode)
   const handleRoleSelect = (selectedRole: 'student' | 'professor' | 'admin') => {
     setRole(selectedRole);
+  };
+
+  const handleQuestionImport = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
+      const makeId = () =>
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const rawItems = Array.isArray(parsed)
+        ? parsed
+        : (
+          parsed
+          && typeof parsed === 'object'
+          && Array.isArray((parsed as { questions?: unknown[] }).questions)
+            ? (parsed as { questions: unknown[] }).questions
+            : null
+        );
+
+      if (!rawItems) {
+        addNotification({
+          type: 'error',
+          title: 'Import Failed',
+          message: 'JSON must be an array or an object with a questions[] field.',
+        });
+        return;
+      }
+
+      const normalized = rawItems
+        .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+        .map((item) => {
+          const testCases = Array.isArray(item.testCases)
+            ? item.testCases
+                .filter((tc): tc is Record<string, unknown> => !!tc && typeof tc === 'object')
+                .map((tc) => ({
+                  id: String(tc.id ?? makeId()),
+                  input: String(tc.input ?? ''),
+                  expectedOutput: String(tc.expectedOutput ?? ''),
+                  isHidden: Boolean(tc.isHidden),
+                  points: Number(tc.points ?? 10),
+                  timeLimit: Number(tc.timeLimit ?? 5000),
+                }))
+            : [];
+
+          return {
+            title: String(item.title ?? '').trim(),
+            description: String(item.description ?? '').trim(),
+            difficulty: (String(item.difficulty ?? 'medium').toLowerCase() as 'easy' | 'medium' | 'hard'),
+            questionType: (String(item.questionType ?? 'coding') as Question['questionType']),
+            topic: String(item.topic ?? 'General').trim(),
+            tags: Array.isArray(item.tags) ? item.tags.map((t) => String(t)) : [],
+            points: Number(item.points ?? 100),
+            timeLimit: Number(item.timeLimit ?? 5),
+            memoryLimit: Number(item.memoryLimit ?? 256),
+            testCases,
+            boilerplateCode:
+              item.boilerplateCode && typeof item.boilerplateCode === 'object'
+                ? item.boilerplateCode as Question['boilerplateCode']
+                : {},
+            solution: item.solution ? String(item.solution) : undefined,
+            hints: Array.isArray(item.hints) ? item.hints.map((h) => String(h)) : undefined,
+            options: Array.isArray(item.options)
+              ? item.options
+                  .filter((o): o is Record<string, unknown> => !!o && typeof o === 'object')
+                  .map((o) => ({
+                    id: String(o.id ?? makeId()),
+                    text: String(o.text ?? ''),
+                    isCorrect: Boolean(o.isCorrect),
+                  }))
+              : null,
+            correctAnswer: item.correctAnswer != null ? String(item.correctAnswer) : null,
+            createdBy: currentUser?.id ?? '',
+            isVisible: item.isVisible !== false,
+          };
+        })
+        .filter((q) => q.title && q.description);
+
+      if (normalized.length === 0) {
+        addNotification({
+          type: 'warning',
+          title: 'Nothing Imported',
+          message: 'No valid questions found in the selected file.',
+        });
+        return;
+      }
+
+      const result = await importQuestions(normalized);
+      if (result.imported === 0) {
+        addNotification({
+          type: 'error',
+          title: 'Import Failed',
+          message: 'No questions were imported. Please verify file format and retry.',
+        });
+      }
+    } catch {
+      addNotification({
+        type: 'error',
+        title: 'Import Failed',
+        message: 'Unable to parse JSON file. Please check the file content.',
+      });
+    }
   };
 
   const loginOrDashboard = isAuthenticated ? (
@@ -513,6 +618,7 @@ const AppRoutes: React.FC = () => {
                   element={
                     <QuestionBank
                       questions={questions}
+                      onImportQuestions={handleQuestionImport}
                       onNavigate={(view) => {
                         if (view === 'create-question') {
                           navigate('/professor/questions/create');

@@ -76,7 +76,7 @@ app.get("/", (c) =>
     name: "Bennett CodeQuest API",
     version: "1.0.0",
     status: "running",
-    docs: "/system/health",
+    docs: "/api/v1/system/health",
   })
 );
 

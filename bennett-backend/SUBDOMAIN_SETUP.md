@@ -2,6 +2,10 @@
 
 Complete guide to setting up the `bennett.codequest.qzz.io` (frontend) and `bennett-api.codequest.qzz.io` (backend API) subdomains using Cloudflare DNS, Cloudflare Tunnel, Vercel, and Supabase.
 
+## Update log
+
+- `2026-04-04T20:10:00Z`: Corrected all backend route references to `/api/v1/*`, updated `VITE_API_BASE_URL` examples to include `/api/v1`, and added `REDIS_URL` documentation for distributed rate limiting + Socket.IO adapter deployments.
+
 ---
 
 ## Architecture Overview
@@ -371,7 +375,7 @@ sudo systemctl status cloudflared
    - **Output Directory:** `dist`
 6. Add Environment Variable:
    - **Name:** `VITE_API_BASE_URL`
-   - **Value:** `https://bennett-api.codequest.qzz.io`
+   - **Value:** `https://bennett-api.codequest.qzz.io/api/v1`
 7. Click **Deploy**
 
 ### 5.2 Add custom subdomain in Vercel
@@ -421,7 +425,7 @@ The Vercel CNAME (`bennett`) must be **DNS only** (grey cloud).
 
 ```powershell
 curl https://bennett-api.codequest.qzz.io/
-curl https://bennett-api.codequest.qzz.io/system/health
+curl https://bennett-api.codequest.qzz.io/api/v1/system/health
 ```
 
 ### 7.2 Frontend loads
@@ -486,8 +490,8 @@ Start-Process cloudflared -ArgumentList "tunnel","run","bennett-api" -WindowStyl
 - Rebuild and restart: `npm run build && node dist/index.js`
 
 ### `404 Not Found` on API routes
-- The backend has no `/api/v1/` prefix — routes are at root level (e.g., `/auth/login`, `/assessments`)
-- Update `VITE_API_BASE_URL` to `https://bennett-api.codequest.qzz.io` (no trailing path)
+- The backend routes are mounted under `/api/v1`.
+- Update `VITE_API_BASE_URL` to `https://bennett-api.codequest.qzz.io/api/v1`.
 
 ### Tunnel shows `connection refused`
 - Backend must be running before tunnel connects
@@ -507,29 +511,29 @@ Start-Process cloudflared -ArgumentList "tunnel","run","bennett-api" -WindowStyl
 
 ## API Route Reference
 
-All routes are served at `https://bennett-api.codequest.qzz.io`:
+All routes are served at `https://bennett-api.codequest.qzz.io/api/v1`:
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/auth/login` | No | User login |
-| POST | `/auth/signup` | No | User registration |
-| POST | `/auth/refresh` | No | Refresh JWT |
-| GET | `/users` | Yes | List users |
-| GET | `/questions` | Yes | List questions |
-| POST | `/questions` | Teacher/Admin | Create question |
-| GET | `/assessments` | Yes | List assessments |
-| POST | `/assessments` | Teacher/Admin | Create assessment |
-| POST | `/assessments/:id/attempts` | Student | Start attempt |
-| GET | `/submissions` | Yes | List submissions |
-| POST | `/execute` | Yes | Run code |
-| GET | `/classes` | Yes | List classes |
-| POST | `/classes` | Admin | Create class |
-| POST | `/classes/:id/enroll` | Admin | Enroll students |
-| POST | `/classes/:id/assessments` | Teacher/Admin | Assign assessment |
-| POST | `/admin/users` | Admin | Create single user |
-| POST | `/admin/users/bulk` | Admin | Bulk create users |
-| GET | `/analytics/*` | Teacher/Admin | Analytics data |
-| GET | `/system/health` | No | Health check |
+| POST | `/api/v1/auth/login` | No | User login |
+| POST | `/api/v1/auth/signup` | No | User registration |
+| POST | `/api/v1/auth/refresh` | No | Refresh JWT |
+| GET | `/api/v1/users` | Yes | List users |
+| GET | `/api/v1/questions` | Yes | List questions |
+| POST | `/api/v1/questions` | Teacher/Admin | Create question |
+| GET | `/api/v1/assessments` | Yes | List assessments |
+| POST | `/api/v1/assessments` | Teacher/Admin | Create assessment |
+| POST | `/api/v1/assessments/:id/attempts` | Student | Start attempt |
+| GET | `/api/v1/submissions` | Yes | List submissions |
+| POST | `/api/v1/execute` | Yes | Run code |
+| GET | `/api/v1/classes` | Yes | List classes |
+| POST | `/api/v1/classes` | Admin | Create class |
+| POST | `/api/v1/classes/:id/enroll` | Admin | Enroll students |
+| POST | `/api/v1/classes/:id/assessments` | Teacher/Admin | Assign assessment |
+| POST | `/api/v1/admin/users` | Admin | Create single user |
+| POST | `/api/v1/admin/users/bulk` | Admin | Bulk create users |
+| GET | `/api/v1/analytics/*` | Teacher/Admin | Analytics data |
+| GET | `/api/v1/system/health` | No | Health check |
 
 ---
 
@@ -546,5 +550,6 @@ All routes are served at `https://bennett-api.codequest.qzz.io`:
 | `RATE_LIMIT_GLOBAL` | No | `100` | Global rate limit per minute |
 | `RATE_LIMIT_AUTH` | No | `10` | Auth endpoint rate limit |
 | `RATE_LIMIT_EXECUTE` | No | `20` | Execute endpoint rate limit |
+| `REDIS_URL` | No | `redis://localhost:6379` | Optional shared store for distributed rate limits + Socket.IO adapter |
 | `CACHE_TTL_DEFAULT` | No | `300` | Default cache TTL in seconds |
 | `CACHE_TTL_ASSESSMENTS` | No | `120` | Assessment cache TTL in seconds |

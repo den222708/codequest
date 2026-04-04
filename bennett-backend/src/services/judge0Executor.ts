@@ -187,22 +187,22 @@ export function executeCodeJudge0Stream(
       try {
         const result = await executeCodeJudge0(code, languageKey);
 
-        if (result.error && !result.output) {
-          controller.enqueue(sseData({ error: result.error }));
-        } else {
-          if (result.output) {
-            controller.enqueue(sseData({ output: result.output }));
-          }
-          if (result.error) {
-            controller.enqueue(sseData({ error: result.error }));
-          }
+        if (result.output) {
+          controller.enqueue(sseData({ type: "stdout", data: result.output }));
         }
+        if (result.error) {
+          controller.enqueue(sseData({ type: "stderr", data: result.error }));
+        }
+
+        controller.enqueue(sseData({ type: "exit", code: result.error ? 1 : 0 }));
       } catch (err) {
         controller.enqueue(
           sseData({
-            error: `Judge0 error: ${err instanceof Error ? err.message : String(err)}`,
+            type: "stderr",
+            data: `Judge0 error: ${err instanceof Error ? err.message : String(err)}`,
           })
         );
+        controller.enqueue(sseData({ type: "exit", code: 1 }));
       } finally {
         try {
           controller.close();
